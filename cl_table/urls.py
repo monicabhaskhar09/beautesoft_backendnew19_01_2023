@@ -13,6 +13,9 @@ router.register(r'customerpointsaccount', views.CustomerPointsAccountViewset, ba
 router.register(r'mgmpolicycloud', views.MGMPolicyCloudViewset, basename='mgmpolicycloud')
 router.register(r'customerreferral', views.CustomerReferralViewset, basename='customerreferral')
 router.register(r'sitelistip', views.SitelistipViewset, basename='sitelistip')
+router.register(r'displaycatalog', views.DisplayCatalogViewset, basename='displaycatalog')
+router.register(r'displayItems', views.DisplayItemViewset, basename='displayItems')
+router.register(r'outletrequestcustomer', views.OutletRequestCustomerViewset, basename='outletrequestcustomer')
 
 
 urlpatterns = [

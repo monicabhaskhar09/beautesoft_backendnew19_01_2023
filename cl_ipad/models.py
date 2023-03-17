@@ -21,6 +21,7 @@ class WebConsultation_Hdr(models.Model):
     consultant_code = models.CharField(db_column='Consultant_Code', max_length=50, null=True, blank=True)  # Field name made lowercase.
     emp_codeid   = models.ForeignKey('cl_table.Employee', on_delete=models.PROTECT, null=True) #, null=True
     updated_at = models.DateTimeField(auto_now=True, null=True)
+    signature = models.ImageField(db_column='Signature', blank=True, null=True,upload_to='img')  # Field name made lowercase.
 
     class Meta:
         db_table = 'WebConsultation_Hdr'
@@ -35,6 +36,12 @@ class WebConsultation_Dtl(models.Model):
     question_number = models.CharField(db_column='questionNumber', max_length=10, null=True, blank=True)  # Field name made lowercase.
     answer = models.IntegerField(db_column='answer', null=True, blank=True)  # Field name made lowercase.
     answer_text = models.CharField(db_column='answerText', max_length=200, null=True, blank=True)  # Field name made lowercase.
+    subquestion_number = models.CharField(db_column='subquestionNumber', max_length=10, null=True, blank=True)  # Field name made lowercase.
+    image = models.ImageField(db_column='image', max_length=255, blank=True, null=True,upload_to='img')  # Field name made lowercase. 
+    pic_data1 = models.TextField(blank=True, null=True)
+    page_number = models.IntegerField(db_column='PageNumber', blank=True, null=True)  # Field name made lowercase.
+
+
     
     class Meta:
         db_table = 'WebConsultation_Dtl'
@@ -56,6 +63,10 @@ class WebConsultation_Question(models.Model):
     question_others = models.CharField(db_column='QuestionOthers', max_length=500, blank=True, null=True)
     site_ids = models.ManyToManyField('cl_app.ItemSitelist',blank=True)
     question_text = models.CharField(db_column='QuestionText',max_length=500,  blank=True, null=True)  # Field name made lowercase.
+    option_type = models.IntegerField(db_column='option_type', blank=True, null=True)  # Field name made lowercase.
+    mandatory = models.BooleanField(db_column='Mandatory',default=False)
+    declaration_text = models.TextField(db_column='Declaration_Text', blank=True, null=True)  # Field name made lowercase.
+
 
     class Meta:
         db_table = 'WebConsultation_Question'
@@ -73,6 +84,21 @@ class WebConsultation_QuestionMultichoice(models.Model):
 
     def __str__(self):
         return str(self.choice)   
+
+class WebConsultation_Questionsub_questions(models.Model):
+    id = models.AutoField(db_column='ID',primary_key=True)
+    questionid   = models.ForeignKey('cl_ipad.WebConsultation_Question', on_delete=models.PROTECT, null=True) #, null=True
+    options = models.CharField(db_column='options', max_length=100, blank=True, null=True)
+    sub_question_english = models.CharField(db_column='sub_question_english', max_length=500, blank=True, null=True)
+    sub_question_chinese = models.CharField(db_column='sub_question_chinese', max_length=500, blank=True, null=True)
+   
+
+    class Meta:
+        db_table = 'WebConsultation_Questionsub_questions'
+
+    def __str__(self):
+        return str(self.sub_question_english)   
+
 
 
 class WebConsultation_AnalysisResult(models.Model):
@@ -169,6 +195,10 @@ class TNC_Master(models.Model):
     isactive = models.BooleanField(db_column='isActive',default=True)
     english = models.CharField(db_column='English', max_length=2000, null=True, blank=True)  # Field name made lowercase.
     otherlanguage = models.CharField(db_column='OtherLanguage', max_length=2000, null=True, blank=True)  # Field name made lowercase.    
+    mandatory = models.BooleanField(db_column='Mandatory',null=True)
+    is_declaration = models.BooleanField(db_column='Declaration',null=True)
+    tnctext1 = models.CharField(db_column='Tnctext1', max_length=500, null=True, blank=True)  # Field name made lowercase.
+    tnctext2 = models.CharField(db_column='Tnctext2', max_length=500, null=True, blank=True)  # Field name made lowercase.
 
     class Meta:
         db_table = 'TNC_Master'

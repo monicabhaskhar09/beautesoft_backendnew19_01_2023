@@ -15,11 +15,14 @@ router.register(r'webconsultationreferralhdr', views.WebConsultation_Referral_Hd
 router.register(r'transactioncustomer', views.TransactionCustomerViewset, basename='transactioncustomer')
 router.register(r'tncmaster', views.TNC_MasterViewset, basename='tncmaster')
 router.register(r'webquestionmultichoice', views.WebConsultationQuestionMultichoiceViewset, basename='webquestionmultichoice')
+router.register(r'webquestionsubquestions', views.WebConsultation_Questionsub_questionsViewset, basename='webquestionsubquestions')
 
 
 urlpatterns = [
     path('api/', include(router.urls)),
-    # path('api/login', views.UserLoginAPIView.as_view(), name='login'),
+    path('api/clientdetails/', views.ClientDetailsListAPIView.as_view(), name='clientdetails'),
+    path('api/webconsultationprint/', views.WebConsultationPrintListAPIView.as_view(), name='webconsultationprint'),
+
    
 
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

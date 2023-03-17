@@ -25,7 +25,8 @@ from .models import (Gender, Employee, Fmspw, Attendance2, Customer, Images, Tre
                      MrRewardItemType,CustomerPoint,TreatmentDuration,Smsreceivelog,TreatmentProtocol,CustomerTitle,CustomerPointDtl,
                      ItemDiv,Tempcustsign,CustomerDocument,TreatmentPackage,Tmptreatment,CustLogAudit,ContactPerson,
                      ItemFlexiservice,termsandcondition,Dayendconfirmlog,Participants,ProjectDocument,
-                     MGMPolicyCloud,CustomerReferral,sitelistip)
+                     MGMPolicyCloud,CustomerReferral,sitelistip,DisplayCatalog,
+                     DisplayItem,OutletRequestLog)
 from cl_app.models import ItemSitelist, SiteGroup, LoggedInUser,TmpTreatmentSession
 from custom.models import Room,ItemCart,VoucherRecord,EmpLevel,PosPackagedeposit,payModeChangeLog,ProjectModel
 from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializer, Attendance2Serializer,
@@ -64,7 +65,9 @@ from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializ
                           FmspwSerializernew,GenderSerializer,CustomerPlusnewSerializer,ContactPersonSerializer,
                           ItemFlexiserviceSerializer,termsandconditionSerializer,ParticipantsSerializer,ProjectDocumentSerializer,
                           Custphone2Serializer,DayendconfirmlogSerializer,CustomerPointAccountSerializer,
-                          MGMPolicyCloudSerializer,CustomerReferralSerializer,SitelistipSerializer)
+                          MGMPolicyCloudSerializer,CustomerReferralSerializer,SitelistipSerializer,
+                          DisplayCatalogSerializer,DisplayItemSerializer,DisplayItemStockSerializer,
+                          DisplayItemlistSerializer,OutletRequestLogSerializer)
 from datetime import date, timedelta, datetime
 import datetime
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
@@ -131,7 +134,7 @@ from tablib import Dataset, Databook
 import xlrd
 import calendar 
 from cl_app.serializers import StockSerializer
-
+from django.utils.dateparse import parse_datetime
 type_ex = ['VT-Deposit','VT-Top Up','VT-Sales']
 
 # Create your views here .
@@ -2283,6 +2286,13 @@ class CountryAPI(generics.ListAPIView):
 
 
 def schedulemonth_time(self, date, emp, site, start, end, type_v, appt, sc_value):
+    if site and site.showallsitebooking == True:
+        site_ids = list(set(ItemSitelist.objects.filter(itemsite_isactive=True,
+        showallsitebooking=True).values_list('itemsite_code', flat=True).distinct()))
+    else:
+        site_ids = [site.itemsite_code]
+    
+    print(site_ids,"site_ids")
     if type_v == "Edit":
         pre_start = get_in_val(self, appt.appt_fr_time)
         pre_end = get_in_val(self, appt.appt_to_time)
@@ -2296,210 +2306,210 @@ def schedulemonth_time(self, date, emp, site, start, end, type_v, appt, sc_value
             # print(pre_start,"pre_start")
             if pre_end > "07:00" and pre_start < "07:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time07=False)
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time07=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time07=False)
 
             if pre_end > "07:30" and pre_start < "08:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time0730=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0730=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time0730=False)   
 
             if pre_end > "08:00" and pre_start < "08:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time08=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time08=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time08=False) 
 
             if pre_end > "08:30" and pre_start < "09:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time0830=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0830=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time0830=False) 
 
             if pre_end > "09:00" and pre_start < "09:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time09=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time09=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time09=False) 
                 
 
             if pre_end > "09:30" and pre_start < "10:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time0930=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0930=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time0930=False) 
 
             if pre_end > "10:00" and pre_start < "10:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time10=False)
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time10=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time10=False)
                     
 
             if pre_end > "10:30" and pre_start < "11:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1030=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1030=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1030=False)  
 
             if pre_end > "11:00" and pre_start < "11:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time11=False)
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time11=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time11=False)
 
             if pre_end > "11:30" and pre_start < "12:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1130=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1130=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1130=False) 
 
         
             if pre_end > "12:00" and pre_start < "12:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time12=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time12=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time12=False)  
 
             if pre_end > "12:30" and pre_start < "13:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1230=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1230=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1230=False) 
 
             if pre_end > "13:00" and pre_start < "13:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time13=False)    
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time13=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time13=False)    
 
             if pre_end > "13:30" and pre_start < "14:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1330=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1330=False)  
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1330=False)  
 
             if pre_end > "14:00" and pre_start < "14:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time14=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time14=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time14=False)  
 
             if pre_end > "14:30" and pre_start < "15:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1430=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1430=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1430=False)   
 
             if pre_end > "15:00" and pre_start < "15:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time15=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time15=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time15=False) 
 
             if pre_end > "15:30" and pre_start < "16:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1530=False)                                                                                                                              
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1530=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1530=False)                                                                                                                              
 
             if pre_end > "16:00" and pre_start < "16:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time16=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time16=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time16=False) 
 
             if pre_end > "16:30" and pre_start < "17:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1630=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1630=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1630=False)  
 
             if pre_end > "17:00" and pre_start < "17:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time17=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time17=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time17=False)  
 
             if pre_end > "17:30" and pre_start < "18:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1730=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1730=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1730=False) 
 
             if pre_end > "18:00" and pre_start < "18:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time18=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time18=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time18=False) 
 
             if pre_end > "18:30" and pre_start < "19:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1830=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1830=False)  
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1830=False)   
 
             if pre_end > "19:00" and pre_start < "19:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time19=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time19=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time19=False) 
 
             if pre_end > "19:30" and pre_start < "20:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time1930=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1930=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time1930=False)   
 
             if pre_end > "20:00" and pre_start < "20:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time20=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time20=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time20=False) 
 
             if pre_end > "20:30" and pre_start < "21:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time2030=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2030=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time2030=False)   
 
             if pre_end > "21:00" and pre_start < "21:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time21=False)  
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time21=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time21=False)  
 
             if pre_end > "21:30" and pre_start < "22:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time2130=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2130=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time2130=False) 
 
             if pre_end > "22:00" and pre_start < "22:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time22=False)   
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time22=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time22=False)   
 
             if pre_end > "22:30" and pre_start < "23:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time2230=False)
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2230=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time2230=False)
 
             if pre_end > "23:00" and pre_start < "23:30":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time23=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time23=False) 
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time23=False) 
 
             if pre_end > "23:30" and pre_start < "24:00":
                 month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                if month:
-                    ScheduleMonth.objects.filter(pk=month.pk).update(time2330=False) 
+                site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2330=False)
+                # if month:
+                #     ScheduleMonth.objects.filter(pk=month.pk).update(time2330=False) 
 
             if check_ids:
                 for i in check_ids:
@@ -2507,419 +2517,419 @@ def schedulemonth_time(self, date, emp, site, start, end, type_v, appt, sc_value
                     end_time = get_in_val(self, i.appt_to_time)
                     if end_time > "07:00" and start_time < "07:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time07=sc_value)
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time07=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time07=sc_value)
 
                     if end_time > "07:30" and start_time < "08:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time0730=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0730=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0730=sc_value)   
 
                     if end_time > "08:00" and start_time < "08:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time08=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time08=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time08=sc_value) 
 
                     if end_time > "08:30" and start_time < "09:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time0830=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0830=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0830=sc_value) 
 
                     if end_time > "09:00" and start_time < "09:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time09=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time09=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time09=sc_value) 
                         
 
                     if end_time > "09:30" and start_time < "10:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time0930=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0930=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0930=sc_value) 
 
                     if end_time > "10:00" and start_time < "10:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time10=sc_value)
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time10=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time10=sc_value)
                             
 
                     if end_time > "10:30" and start_time < "11:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1030=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1030=sc_value)  
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1030=sc_value)  
 
                     if end_time > "11:00" and start_time < "11:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time11=sc_value)
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time11=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time11=sc_value)
 
                     if end_time > "11:30" and start_time < "12:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1130=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1130=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1130=sc_value) 
 
                 
                     if end_time > "12:00" and start_time < "12:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time12=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time12=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time12=sc_value)  
 
                     if end_time > "12:30" and start_time < "13:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1230=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1230=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1230=sc_value) 
 
                     if end_time > "13:00" and start_time < "13:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time13=sc_value)    
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time13=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time13=sc_value)    
 
                     if end_time > "13:30" and start_time < "14:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1330=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1330=sc_value)  
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1330=sc_value)  
 
                     if end_time > "14:00" and start_time < "14:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time14=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time14=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time14=sc_value)  
 
                     if end_time > "14:30" and start_time < "15:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1430=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1430=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1430=sc_value)   
 
                     if end_time > "15:00" and start_time < "15:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time15=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time15=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time15=sc_value) 
 
                     if end_time > "15:30" and start_time < "16:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1530=sc_value)                                                                                                                              
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1530=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1530=sc_value)                                                                                                                              
 
                     if end_time > "16:00" and start_time < "16:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time16=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time16=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time16=sc_value) 
 
                     if end_time > "16:30" and start_time < "17:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1630=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1630=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1630=sc_value)  
 
                     if end_time > "17:00" and start_time < "17:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time17=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time17=sc_value)  
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time17=sc_value)  
 
                     if end_time > "17:30" and start_time < "18:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1730=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1730=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1730=sc_value) 
 
                     if end_time > "18:00" and start_time < "18:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time18=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time18=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time18=sc_value) 
 
                     if end_time > "18:30" and start_time < "19:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1830=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1830=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1830=sc_value)   
 
                     if end_time > "19:00" and start_time < "19:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time19=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time19=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time19=sc_value) 
 
                     if end_time > "19:30" and start_time < "20:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time1930=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1930=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1930=sc_value)   
 
                     if end_time > "20:00" and start_time < "20:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time20=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time20=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time20=sc_value) 
 
                     if end_time > "20:30" and start_time < "21:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time2030=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2030=sc_value)  
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2030=sc_value)   
 
                     if end_time > "21:00" and start_time < "21:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time21=sc_value)  
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time21=sc_value)  
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time21=sc_value)  
 
                     if end_time > "21:30" and start_time <= "22:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time2130=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2130=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2130=sc_value) 
 
                     if end_time > "22:00" and start_time < "22:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time22=sc_value)   
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time22=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time22=sc_value)   
 
                     if end_time > "22:30" and start_time < "23:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time2230=sc_value)
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2230=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2230=sc_value)
 
                     if end_time > "23:00" and start_time < "23:30":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time23=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time23=sc_value) 
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time23=sc_value) 
 
                     if end_time > "23:30" and start_time < "24:00":
                         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=pre_emp.pk,
-                        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-                        if month:
-                            ScheduleMonth.objects.filter(pk=month.pk).update(time2330=sc_value) 
+                        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2330=sc_value)
+                        # if month:
+                        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2330=sc_value) 
                     
             
     if end > "07:00" and start < "07:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time07=sc_value)
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time07=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time07=sc_value)
 
     if end > "07:30" and start < "08:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time0730=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0730=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0730=sc_value)   
 
     if end > "08:00" and start < "08:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time08=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time08=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time08=sc_value) 
 
     if end > "08:30" and start < "09:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time0830=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0830=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0830=sc_value) 
 
     if end > "09:00" and start < "09:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time09=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time09=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time09=sc_value) 
           
 
     if end > "09:30" and start < "10:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time0930=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time0930=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time0930=sc_value) 
 
 
     if end > "10:00" and start < "10:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time10=sc_value)
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time10=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time10=sc_value)
              
 
     if end > "10:30" and start < "11:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1030=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1030=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1030=sc_value)  
 
     if end > "11:00" and start < "11:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time11=sc_value)
         if month:
             ScheduleMonth.objects.filter(pk=month.pk).update(time11=sc_value)
 
     if end > "11:30" and start < "12:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1130=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1130=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1130=sc_value) 
 
   
     if end > "12:00" and start < "12:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time12=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time12=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time12=sc_value)  
 
     if end > "12:30" and start < "13:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1230=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1230=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1230=sc_value) 
 
     if end > "13:00" and start < "13:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time13=sc_value)    
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time13=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time13=sc_value)    
 
     if end > "13:30" and start < "14:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1330=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1330=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1330=sc_value)  
 
     if end > "14:00" and start < "14:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time14=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time14=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time14=sc_value)  
 
     if end > "14:30" and start < "15:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1430=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1430=sc_value)   
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1430=sc_value)   
 
     if end > "15:00" and start < "15:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time15=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time15=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time15=sc_value) 
 
     if end > "15:30" and start < "16:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1530=sc_value)                                                                                                                              
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1530=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1530=sc_value)                                                                                                                              
 
     if end > "16:00" and start < "16:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time16=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time16=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time16=sc_value) 
 
     if end > "16:30" and start < "17:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1630=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1630=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1630=sc_value)  
 
     if end > "17:00" and start < "17:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time17=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time17=sc_value)  
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time17=sc_value)  
 
     if end > "17:30" and start < "18:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1730=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1730=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1730=sc_value) 
 
     if end > "18:00" and start < "18:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time18=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time18=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time18=sc_value) 
 
     if end > "18:30" and start < "19:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1830=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1830=sc_value)  
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1830=sc_value)   
 
     if end > "19:00" and start < "19:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time19=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time19=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time19=sc_value) 
 
     if end > "19:30" and start < "20:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time1930=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time1930=sc_value)  
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time1930=sc_value)   
 
     if end > "20:00" and start < "20:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time20=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time20=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time20=sc_value) 
 
     if end > "20:30" and start < "21:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time2030=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2030=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2030=sc_value)   
 
     if end > "21:00" and start < "21:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time21=sc_value)  
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time21=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time21=sc_value)  
 
     if end > "21:30" and start <= "22:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time2130=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2130=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2130=sc_value) 
 
     if end > "22:00" and start < "22:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time22=sc_value)   
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time22=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time22=sc_value)   
 
     if end > "22:30" and start < "23:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time2230=sc_value)
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2230=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2230=sc_value)
 
     if end > "23:00" and start < "23:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time23=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time23=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time23=sc_value) 
 
     if end > "23:30" and start < "24:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
-        site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time2330=sc_value) 
+        site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time2330=sc_value) 
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time2330=sc_value) 
                  
     return True        
 
@@ -4297,11 +4307,11 @@ class AppointmentResourcesViewset(viewsets.ModelViewSet):
                 sc_time =  schedulemonth_time(self, request.data['appt_date'], emp_obj, site, request.data['start_time'], request.data['end_time'], dr_type, appobj, sc_value)
                 
                 trmtt_ids = False
-                if appobj.treatmentcode and appobj.sa_transacno:
-                    #trmtt_ids = Treatment.objects.filter(treatment_code=app.treatmentcode,
-                    #sa_transacno=appobj.sa_transacno,site_code=site.itemsite_code).first()
-                    trmtt_ids = Treatment.objects.filter(treatment_code=appobj.treatmentcode,
-                    sa_transacno=appobj.sa_transacno).first()
+                # if appobj.treatmentcode and appobj.sa_transacno:
+                #     #trmtt_ids = Treatment.objects.filter(treatment_code=app.treatmentcode,
+                #     #sa_transacno=appobj.sa_transacno,site_code=site.itemsite_code).first()
+                #     trmtt_ids = Treatment.objects.filter(treatment_code=appobj.treatmentcode,
+                #     sa_transacno=appobj.sa_transacno).first()
                  
                 if 'appt_date' in request.data and request.data['appt_date']:
                     if not request.data['appt_date'] is None:
@@ -4852,7 +4862,7 @@ class AppointmentEditViewset(viewsets.ModelViewSet):
 
                         treat = {'appt_id': i.pk,'start_time':start_time,'end_time':end_time,'add_duration':add_duration,
                         'item_name': i.appt_remark,'item_id': i.Item_Codeid.pk if i.Item_Codeid else "",
-                        'item_text' : None,
+                        'item_text' : i.appt_remark,
                         'emp_name': i.emp_noid.display_name,'emp_id':i.emp_noid.pk,
                         'requesttherapist': i.requesttherapist,
                         'recur_qty': i.recurring_qty if i.recurring_qty else "",
@@ -5223,11 +5233,11 @@ class AppointmentEditViewset(viewsets.ModelViewSet):
                         #    return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
                         trmtt_ids = False
-                        if appt_obj.treatmentcode and appt_obj.sa_transacno:
-                            #trmtt_ids = Treatment.objects.filter(treatment_code=app.treatmentcode,
-                            #sa_transacno=appt_obj.sa_transacno,site_code=site.itemsite_code).first()
-                            trmtt_ids = Treatment.objects.filter(treatment_code=appt_obj.treatmentcode,
-                            sa_transacno=appt_obj.sa_transacno).first()
+                        # if appt_obj.treatmentcode and appt_obj.sa_transacno:
+                        #     #trmtt_ids = Treatment.objects.filter(treatment_code=app.treatmentcode,
+                        #     #sa_transacno=appt_obj.sa_transacno,site_code=site.itemsite_code).first()
+                        #     trmtt_ids = Treatment.objects.filter(treatment_code=appt_obj.treatmentcode,
+                        #     sa_transacno=appt_obj.sa_transacno).first()
                         
                         if 'appt_date' in appt and appt['appt_date']:
                             if not appt['appt_date'] is None:
@@ -5915,7 +5925,7 @@ class AppointmentSortAPIView(generics.ListCreateAPIView):
         sc_system_obj = Systemsetup.objects.filter(title='Workschedule',
         value_name='Workschedule',isactive=True).first()
 
-        if fmspw[0].flgappt == True: 
+        # if fmspw[0].flgappt == True: 
             #Therapist
             # if emp.show_in_appt == True:
             #     site_list = EmpSitelist.objects.filter(Emp_Codeid=emp,Site_Codeid__pk=site.pk,isactive=True)
@@ -5936,21 +5946,21 @@ class AppointmentSortAPIView(generics.ListCreateAPIView):
                         
             # #manager -> Therapist,Consultant staffs as Resources
             # elif emp.show_in_appt == False:
-            emp_siteids = EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,isactive=True)
-            staffs = list(set([e.Emp_Codeid.pk for e in emp_siteids if e.Emp_Codeid and e.Emp_Codeid.emp_isactive == True]))
-            emp_queryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,
-            show_in_appt=True) 
-            if sc_system_obj and sc_system_obj.value_data == 'True':
-                staffs_f = list(set([e.pk for e in emp_queryset if e.pk and e.emp_isactive == True]))
-                month = ScheduleMonth.objects.filter(itm_date=date,Emp_Codeid__pk__in=staffs_f,
-                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007'))
-                final = list(set([e.Emp_Codeid.pk for e in month if e.Emp_Codeid]))
-                queryset = Employee.objects.filter(pk__in=final,emp_isactive=True,
-                show_in_appt=True).order_by('emp_seq_webappt')
-            else:
-                if sc_system_obj and sc_system_obj.value_data == 'False': 
-                    queryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,
-                    show_in_appt=True).order_by('emp_seq_webappt')     
+        emp_siteids = EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,isactive=True)
+        staffs = list(set([e.Emp_Codeid.pk for e in emp_siteids if e.Emp_Codeid and e.Emp_Codeid.emp_isactive == True]))
+        emp_queryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,
+        show_in_appt=True) 
+        if sc_system_obj and sc_system_obj.value_data == 'True':
+            staffs_f = list(set([e.pk for e in emp_queryset if e.pk and e.emp_isactive == True]))
+            month = ScheduleMonth.objects.filter(itm_date=date,Emp_Codeid__pk__in=staffs_f,
+            site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007'))
+            final = list(set([e.Emp_Codeid.pk for e in month if e.Emp_Codeid]))
+            queryset = Employee.objects.filter(pk__in=final,emp_isactive=True,
+            show_in_appt=True).order_by('emp_seq_webappt')
+        else:
+            if sc_system_obj and sc_system_obj.value_data == 'False': 
+                queryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,
+                show_in_appt=True).order_by('emp_seq_webappt')     
         
         return queryset
    
@@ -7626,7 +7636,8 @@ class UsersList(APIView):
 
     def get(self, request, format=None):
         try:
-            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).order_by('-pk').first()
+            fmspw = Fmspw.objects.filter(user=self.request.user
+            ,pw_isactive=True).order_by('-pk').first()
 
             price_setup = Systemsetup.objects.filter(title='showChangePrice',
             value_name='showChangePrice',isactive=True).first()
@@ -7705,6 +7716,16 @@ class UsersList(APIView):
             value_name='quickPrint',isactive=True).first()
             updisc_setup = Systemsetup.objects.filter(title='showUnitPriceDiscOnView',
             value_name='showUnitPriceDiscOnView',isactive=True).first()
+
+            refer_setup = Systemsetup.objects.filter(title='UpdateCustCodeToCustRefer',
+            value_name='UpdateCustCodeToCustRefer',isactive=True).first()
+            userswitch_setup = Systemsetup.objects.filter(title='userswitch',
+            value_name='userswitch',isactive=True).first()
+            poolsharing_setup = Systemsetup.objects.filter(title='PoolSharing',
+            value_name='PoolSharing',isactive=True).first()
+            outletrestrict_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
+            value_name='Customeroutletrestrict',isactive=True).first()
+       
        
     
     
@@ -7725,16 +7746,43 @@ class UsersList(APIView):
                 controlsite = cosystem_setup.value_data 
             else:
                 controlsite = ""   
-            
+
+            # t = ItemSitelist._meta.get_fields() 
+            # print(t,"t")
+            # print(fmspw,fmspw.pk,"fmspw")
+            # print(fmspw.loginsite,"fmspw.loginsite")
+            # print(fmspw.loginsite.service_sel,"fmspw.loginsite.service_sel")
+
+            empsite_ids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=fmspw.loginsite.pk,
+            isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__isdelete=False).order_by('-pk').values_list('Emp_Codeid', flat=True).distinct()))
+            ufmspw_ids = Fmspw.objects.filter(Emp_Codeid__pk__in=empsite_ids,pw_isactive=True).filter(~Q(pk=fmspw.pk)).values('pw_id','pw_userlogin')
+
+            emp_ids = EmpSitelist.objects.filter(emp_code=fmspw.Emp_Codeid.emp_code,isactive=True)
+            # print(emp_ids,"empids")
+            emp_lst = list(set([e.Site_Codeid.pk for e in emp_ids if e.Site_Codeid]))
+            # print(emp_lst,"emp_lst")
+            sites = []
+            itemsites = ItemSitelist.objects.filter(pk__in=emp_lst,itemsite_isactive=True).order_by('pk')
+            if itemsites:
+                for d in itemsites:
+                   val = {'id': d.itemsite_id, 'itemsite_code': d.itemsite_code, 'itemsite_desc': d.itemsite_desc}
+                   sites.append(val)
+
             token = Token.objects.filter(user=self.request.user).first()
+
             data = {'username':self.request.user.username,'token':token.key,
-            'role_code': fmspw.LEVEL_ItmIDid.role_code if fmspw.LEVEL_ItmIDid.role_code else "",
-            'role':fmspw.LEVEL_ItmIDid.level_name,'level_code': fmspw.LEVEL_ItmIDid.level_code,
-            'branch': fmspw.loginsite.itemsite_desc if fmspw.loginsite else "",
-            'service_sel': fmspw.loginsite.service_sel, 'service_text': fmspw.loginsite.service_text,
+            'role_code': fmspw.LEVEL_ItmIDid.role_code if fmspw.LEVEL_ItmIDid and fmspw.LEVEL_ItmIDid.role_code else "",
+            'role':fmspw.LEVEL_ItmIDid.level_name if fmspw.LEVEL_ItmIDid and fmspw.LEVEL_ItmIDid.level_name else "",
+            'level_code': fmspw.LEVEL_ItmIDid.level_code if fmspw.LEVEL_ItmIDid and fmspw.LEVEL_ItmIDid.level_code else "",
+            'logined_siteid' : fmspw.loginsite.pk if fmspw.loginsite else "",
+            'switch_sites' : sites,
+            'switch_users': ufmspw_ids,
+            'branch': fmspw.loginsite.itemsite_desc if fmspw.loginsite and fmspw.loginsite.itemsite_desc else "",
+            'service_sel': fmspw.loginsite.service_sel if fmspw.loginsite and fmspw.loginsite.service_sel else "",
+            'service_text': fmspw.loginsite.service_text if fmspw.loginsite and fmspw.loginsite.service_text else "",
             'site_code': fmspw.loginsite.itemsite_code if fmspw.loginsite and fmspw.loginsite.itemsite_code else "",
-            'sitePhone': fmspw.loginsite.itemsite_phone1,
-            'default_loginid': fmspw.Emp_Codeid.pk,
+            'sitePhone': fmspw.loginsite.itemsite_phone1 if fmspw.loginsite and fmspw.loginsite.itemsite_phone1 else "",
+            'default_loginid': fmspw.Emp_Codeid.pk if fmspw.Emp_Codeid else "",
             'showChangePrice': True if price_setup and price_setup.value_data == 'True' else False,
             'showChangePayMode': True if paymode_setup and paymode_setup.value_data == 'True' else False,
             'showChangeDate' :  True if date_setup and date_setup.value_data == 'True' else False,
@@ -7793,6 +7841,10 @@ class UsersList(APIView):
             'autotdforalacarte' : True if autotdfor_setup and autotdfor_setup.value_data == 'True' else False, 
             'quickprint': True if quickprint_setup and quickprint_setup.value_data == 'True' else False,
             'show_unitpricedisconview': True if updisc_setup and updisc_setup.value_data == 'True' else False,  
+            'updatecustcodetocustrefer': True if refer_setup and refer_setup.value_data == 'True' else False,  
+            'userswitch' : True if userswitch_setup and userswitch_setup.value_data == 'True' else False,  
+            'poolsharing' : True if poolsharing_setup and poolsharing_setup.value_data == 'True' else False,  
+            'customeroutletrestrict' : True if outletrestrict_setup and outletrestrict_setup.value_data == 'True' else False,  
             }
 
 
@@ -8226,7 +8278,8 @@ class postaudViewset(viewsets.ModelViewSet):
                     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Payment checkout is not possible",'error': True}
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
             
-            value = postaud_calculation(self, request, queryset)
+            paydate = datetime.datetime.strptime(str(poshaud_v.sa_date), "%Y-%m-%d %H:%M:%S").date()
+            value = postaud_calculation(self, request, queryset,paydate)
 
             postaud_v = PosTaud.objects.filter(sa_transacno=sa_transacno)
           
@@ -8281,7 +8334,8 @@ class postaudViewset(viewsets.ModelViewSet):
                         if sitegst.site_is_gst == False:
                             calcgst = 0    
 
-                value = postaud_calculation(self, request, queryset)
+                paydate = datetime.datetime.strptime(str(poshaud_v.sa_date), "%Y-%m-%d %H:%M:%S").date()  
+                value = postaud_calculation(self, request, queryset,paydate)
 
                 depotop_ids = queryset.filter(type__in=['Deposit','Top Up'])
                 sales_ids = queryset.filter(type='Sales')     
@@ -11112,7 +11166,7 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                     d['sales_staff'] = sales_staff
                     d['work_staff'] = work_staff
 
-                if d['isfoc'] == True:
+                if d['isfoc'] == True and d['holditemqty'] is None:
                     d['dt_itemdesc'] = d['dt_itemdesc']
                 elif d['dt_status'] == 'SA' and d['record_detail_type'] == "PACKAGE":
                     d['dt_itemdesc'] = d['dt_itemdesc']+"-"+str(packages)    
@@ -12881,7 +12935,22 @@ class CustApptAPI(generics.ListAPIView):
             queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
         else:
             queryset = Customer.objects.filter(cust_isactive=True,site_code=site.itemsite_code).only('cust_isactive').order_by('-pk')
-    
+        
+        asystem_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
+        value_name='Customeroutletrestrict',isactive=True).first()
+        if asystem_setup and asystem_setup.value_data == 'True':
+            queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
+        else:
+            queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
+        
+        if self.request.GET.get('customeroutletrestrict',None) == '1':
+            if asystem_setup and asystem_setup.value_data == 'True':
+                queryset = Customer.objects.filter(cust_isactive=True).filter(~Q(or_key=site.itemsite_code),~Q(or_key__isnull=True)).only('cust_isactive').order_by('-pk')
+            else:
+                queryset = Customer.objects.objects.none()
+            
+
+
 
         q = self.request.GET.get('search',None)
         if q:
@@ -14500,9 +14569,9 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                     if acc_ids:    
                                         d_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                         'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                        'amt': "{:.2f}".format(abs(acc_ids.amount)) if acc_ids.amount else "0.00",
+                                        'amount': "{:.2f}".format(abs(acc_ids.amount)) if acc_ids.amount else "0.00",
                                         'balance': "{:.2f}".format(abs(acc_ids.balance)) if acc_ids.balance else "0.00",
-                                        'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                        'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                         'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                         sal_det_lst.append(d_val)
                             elif c.record_detail_type == 'PRODUCT': 
@@ -14514,9 +14583,9 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                     if dpacc_ids: 
                                         deval = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                         'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                        'amt': "{:.2f}".format(abs(dpacc_ids.amount)) if dpacc_ids.amount else "0.00",
+                                        'amount': "{:.2f}".format(abs(dpacc_ids.amount)) if dpacc_ids.amount else "0.00",
                                         'balance': "{:.2f}".format(abs(dpacc_ids.balance)) if dpacc_ids.balance else "0.00",
-                                        'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                        'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                         'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                         sal_det_lst.append(deval)
                             elif c.record_detail_type == 'PREPAID':
@@ -14525,24 +14594,57 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                 if pracc_ids:
                                     prval = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                     'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                    'amt': "{:.2f}".format(pracc_ids.pp_total) if pracc_ids.pp_total else "0.00",
+                                    'amount': "{:.2f}".format(pracc_ids.pp_total) if pracc_ids.pp_total else "0.00",
                                     'balance': "{:.2f}".format(pracc_ids.remain) if pracc_ids.remain else "0.00",
-                                    'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                    'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                     'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                     sal_det_lst.append(prval)
                             elif c.record_detail_type == 'VOUCHER':
                                 voc_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                 'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                'amt': "{:.2f}".format(c.dt_amt) if c.dt_amt else "0.00",'balance': "",
-                                'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                'amount': "{:.2f}".format(c.dt_amt) if c.dt_amt else "0.00",'balance': "",
+                                'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                 'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                 sal_det_lst.append(voc_val)
                             elif c.record_detail_type == 'PACKAGE':
+                                ps_amount = 0; ps_balance = 0
                                 packhdrids = PackageHdr.objects.filter(code=c.dt_itemno[:-4]).first()
                                 if packhdrids:
                                     packdtlids = PackageDtl.objects.filter(package_code=packhdrids.code,isactive=True)
                                     if packdtlids:
+
+                                        ptracc_ids = list(set(TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                        dt_lineno=c.dt_lineno,cust_code=d.sa_custno).values_list('treatment_parentcode', flat=True).distinct()))
+                                        # print(ptracc_ids,"ptracc_ids")
+                                        if ptracc_ids:
+                                            for ps in ptracc_ids:
+                                                psaccids = TreatmentAccount.objects.filter(ref_transacno=d.sa_transacno,
+                                                treatment_parentcode=ps).order_by('-sa_date','-sa_time','-id').first()
+                                                # print(psaccids,psaccids.pk,"psaccids")
+                                                if psaccids and psaccids.amount >= 0:
+                                                    # print(psaccids.amount,"psaccids.amount")
+                                                    ps_amount += psaccids.amount
+                                                if psaccids and psaccids.balance >= 0:
+                                                    # print(psaccids.balance,"psaccids.balance")
+                                                    ps_balance += psaccids.balance
+
+                                        psdep_acc = DepositAccount.objects.filter(cust_code=d.sa_custno,
+                                        type='Deposit',sa_transacno=d.sa_transacno,dt_lineno=c.dt_lineno).only('cust_code','type').order_by('pk')
+                                        if psdep_acc:
+                                            for pdst in psdep_acc:
+                                                pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                    treat_code=pdst.treat_code).order_by('-sa_date','-sa_time','-id').first()
+                                                # print(pdeacc_ids,pdeacc_ids.pk,"jj")
+                                                if pdeacc_ids and pdeacc_ids.amount >= 0:
+                                                    ps_amount += pdeacc_ids.amount
+                                                    # print(pdeacc_ids.amount,"pdeacc_ids.amount")
+                                                if pdeacc_ids and pdeacc_ids.balance >= 0:
+                                                    ps_balance += pdeacc_ids.balance
+                                                    # print(pdeacc_ids.balance,"pdeacc_ids.balance")
+
+
                                         for pad in packdtlids:
+                                            # print(pad,"pad")
                                             packdtlcode = str(pad.code)
                                             itmcode = packdtlcode[:-4]
                                             itm_stock = Stock.objects.filter(item_code=itmcode).first()
@@ -14553,48 +14655,73 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                                     p = pos_ids.first()
                                                     pa_trasac = p.price * p.qty
                                                     pa_deposit = p.deposit_amt
-                                                    if int(itm_stock.item_div) == 3:
-                                                        ptracc_ids = TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
-                                                        dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up','Sales']).order_by('-pk').first()
-                                                        if ptracc_ids:
-                                                            s_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                            'desc':pad.description,'qty':pad.qty,
-                                                            'amt': "{:.2f}".format(abs(ptracc_ids.amount)) if ptracc_ids.amount else "0.00",
-                                                            'balance': "{:.2f}".format(abs(ptracc_ids.balance)) if ptracc_ids.balance else "0.00",
-                                                            'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                            'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                            sal_det_lst.append(s_val)
-                                                    elif int(itm_stock.item_div) == 1:
-                                                        pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
-                                                        dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up']).order_by('-pk').first()
-                                                        if pdeacc_ids:
-                                                            r_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                            'desc':pad.description,'qty':pad.qty,
-                                                            'amt': "{:.2f}".format(abs(pdeacc_ids.amount)) if pdeacc_ids.amount else "0.00",
-                                                            'balance': "{:.2f}".format(abs(pdeacc_ids.balance)) if pdeacc_ids.balance else "0.00",
-                                                            'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                            'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                            sal_det_lst.append(r_val) 
-                                                    elif int(itm_stock.item_div) == 5:
-                                                        prep_acc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
-                                                        line_no=c.dt_lineno,sa_status__in=['DEPOSIT','TOPUP','SA']).order_by('-pk').first()
-                                                        if prep_acc_ids:
-                                                            pr_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                            'desc':pad.description,'qty':pad.qty,
-                                                            'amt': "{:.2f}".format(prep_acc_ids.pp_total) if prep_acc_ids.pp_total else "0.00",
-                                                            'balance': "{:.2f}".format(prep_acc_ids.remain) if prep_acc_ids.remain else "0.00",
-                                                            'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                            'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                            sal_det_lst.append(pr_val)
-                                                    elif int(itm_stock.item_div) == 4: 
-                                                        vo_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                        'desc':pad.description,'qty':pad.qty,
-                                                        'amt': "{:.2f}".format(pad.ttl_uprice) if pad.ttl_uprice else "0.00",
-                                                        'balance': "",'satransac_ref' : d.sa_transacno_ref,
-                                                        'amount': "{:.2f}".format(pa_trasac),
-                                                        'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                        sal_det_lst.append(vo_val)
 
+                                                    # if int(itm_stock.item_div) == 3:
+
+                                                        
+                                                        # ptracc_ids = TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                        # dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up','Sales']).order_by('-pk').first()
+                                                        # if ptracc_ids:
+                                                        #     s_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                        #     'desc':pad.description,'qty':pad.qty,
+                                                        #     'amt': "{:.2f}".format(abs(ptracc_ids.amount)) if ptracc_ids.amount else "0.00",
+                                                        #     'balance': "{:.2f}".format(abs(ptracc_ids.balance)) if ptracc_ids.balance else "0.00",
+                                                        #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                        #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                        #     sal_det_lst.append(s_val)
+
+                                                    # elif int(itm_stock.item_div) == 1:
+
+                                                       
+                                                        # pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                        # dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up']).order_by('-pk').first()
+                                                        # if pdeacc_ids:
+                                                        #     r_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                        #     'desc':pad.description,'qty':pad.qty,
+                                                        #     'amt': "{:.2f}".format(abs(pdeacc_ids.amount)) if pdeacc_ids.amount else "0.00",
+                                                        #     'balance': "{:.2f}".format(abs(pdeacc_ids.balance)) if pdeacc_ids.balance else "0.00",
+                                                        #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                        #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                        #     sal_det_lst.append(r_val) 
+
+                                                    if int(itm_stock.item_div) == 5:
+                                                        lst_preacc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
+                                                        status=True,line_no=c.dt_lineno,package_code_lineno=pad.line_no).order_by('-pk').only('pp_no','status','line_no').first()
+                                                        # print(lst_preacc_ids,lst_preacc_ids.pk,"kk")
+                                                        if lst_preacc_ids and lst_preacc_ids.pp_total >= 0:
+                                                            ps_amount += lst_preacc_ids.pp_amt
+                                                        if lst_preacc_ids and lst_preacc_ids.remain >= 0:
+                                                            ps_balance += lst_preacc_ids.remain
+
+                                                        # prep_acc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
+                                                        # line_no=c.dt_lineno,sa_status__in=['DEPOSIT','TOPUP','SA']).order_by('-pk').first()
+                                                        # if prep_acc_ids:
+                                                        #     pr_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                        #     'desc':pad.description,'qty':pad.qty,
+                                                        #     'amt': "{:.2f}".format(prep_acc_ids.pp_total) if prep_acc_ids.pp_total else "0.00",
+                                                        #     'balance': "{:.2f}".format(prep_acc_ids.remain) if prep_acc_ids.remain else "0.00",
+                                                        #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                        #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                        #     sal_det_lst.append(pr_val)
+                                                    elif int(itm_stock.item_div) == 4: 
+                                                        
+                                                        ps_amount += pad.price * pad.qty
+                                                        # print(pad.price * pad.qty,"pad.price")
+                                                        # vo_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                        # 'desc':pad.description,'qty':pad.qty,
+                                                        # 'amt': "{:.2f}".format(pad.ttl_uprice) if pad.ttl_uprice else "0.00",
+                                                        # 'balance': "",'satransac_ref' : d.sa_transacno_ref,
+                                                        # 'amount': "{:.2f}".format(pa_trasac),
+                                                        # 'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                        # sal_det_lst.append(vo_val)
+
+                                d_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                    'desc':c.dt_itemdesc,'qty':c.dt_qty,
+                                    'amount': "{:.2f}".format(abs(ps_amount)) if ps_amount else "0.00",
+                                    'balance': "{:.2f}".format(abs(ps_balance)) if ps_balance else "0.00",
+                                    'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
+                                    'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
+                                sal_det_lst.append(d_val)  
                 
 
 
@@ -14649,7 +14776,7 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                 # td_ids =  Treatment.objects.filter(status='Done',treatment_date__date=givendate,
                 # site_code=site.itemsite_code).order_by('-pk')  
                 td_ids =  Treatment.objects.filter(status='Done',treatment_date__date=givendate,
-                site_code=site.itemsite_code).order_by('-pk')
+                ).order_by('-pk')
                 for i in td_ids:
                     # print(i.treatment_code,i.sa_transacno,"i.treatment_code")
                     # haud_id = PosHaud.objects.filter(itemsite_code=site.itemsite_code,
@@ -14659,28 +14786,31 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                     if haud_id and haud_id.sa_custnoid:
                         # cust_obj = Customer.objects.filter(cust_code=i.cust_code,cust_isactive=True).order_by('-pk').first()
                         # if cust_obj:
+                        # times=i.times,treatment_no=i.treatment_no
                         helper_ids = ItemHelper.objects.filter(item_code=i.treatment_code,sa_transacno=i.sa_transacno,
-                        times=i.times,treatment_no=i.treatment_no).order_by('-pk')
+                        site_code=site.itemsite_code).order_by('-pk')
                             
-                        done_outlet = ""
+                        done_outlet = ""; td_sa_transacno_ref = ""
                         # helperids = ItemHelper.objects.filter(item_code=i.treatment_code,
                         # sa_transacno=i.sa_transacno).order_by('-pk').first()
                         # print(helperids,"helperids")
                         if helper_ids:
-                            haudid = PosHaud.objects.filter(isvoid=False,sa_transacno=helper_ids[0].helper_transacno).order_by('-pk').first()
+                            haudid = PosHaud.objects.filter(isvoid=False,
+                            sa_transacno=helper_ids[0].helper_transacno).order_by('-pk').first()
                             # print(haudid,"haudid")
                             if haudid:
+                                td_sa_transacno_ref = haudid.sa_transacno_ref
                                 done_outlet = haudid.itemsite_code
 
-                        td_vals = {'treatment_done':haud_id.sa_transacno_ref,'desc':i.course,
-                                'amount': "{:.2f}".format(i.unit_amount),'cust_name': haud_id.sa_custnoid.cust_name,
-                                'cust_code': haud_id.sa_custnoid.cust_code,
-                                'cust_refer': haud_id.sa_custnoid.cust_refer if haud_id.sa_custnoid.cust_refer else '',
-                                'staff_name': ','.join(list(set([v.helper_name for v in helper_ids if v.helper_name]))),
-                                'buy_treatment_outlet': haud_id.itemsite_code,
-                                'treatmentdone_outlet': done_outlet,
-                                'treatment_code': i.treatment_code}
-                        tdlst.append(td_vals)
+                                td_vals = {'treatment_done':td_sa_transacno_ref,'desc':i.course,
+                                        'amount': "{:.2f}".format(i.unit_amount),'cust_name': haud_id.sa_custnoid.cust_name,
+                                        'cust_code': haud_id.sa_custnoid.cust_code,
+                                        'cust_refer': haud_id.sa_custnoid.cust_refer if haud_id.sa_custnoid.cust_refer else '',
+                                        'staff_name': ','.join(list(set([v.helper_name for v in helper_ids if v.helper_name]))),
+                                        'buy_treatment_outlet': haud_id.itemsite_code,
+                                        'treatmentdone_outlet': done_outlet,
+                                        'treatment_code': i.treatment_code}
+                                tdlst.append(td_vals)
 
 
 
@@ -15280,9 +15410,9 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                         if acc_ids:    
                                             d_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                             'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                            'amt': "{:.2f}".format(abs(acc_ids.amount)) if acc_ids.amount else "0.00",
+                                            'amount': "{:.2f}".format(abs(acc_ids.amount)) if acc_ids.amount else "0.00",
                                             'balance': "{:.2f}".format(abs(acc_ids.balance)) if acc_ids.balance else "0.00",
-                                            'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                            'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                             'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                             sal_det_lst.append(d_val)
                                 elif c.record_detail_type == 'PRODUCT': 
@@ -15294,9 +15424,9 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                         if dpacc_ids: 
                                             deval = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                             'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                            'amt': "{:.2f}".format(abs(dpacc_ids.amount)) if dpacc_ids.amount else "0.00",
+                                            'amount': "{:.2f}".format(abs(dpacc_ids.amount)) if dpacc_ids.amount else "0.00",
                                             'balance': "{:.2f}".format(abs(dpacc_ids.balance)) if dpacc_ids.balance else "0.00",
-                                            'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                            'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                             'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                             sal_det_lst.append(deval)
                                 elif c.record_detail_type == 'PREPAID':
@@ -15305,24 +15435,57 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                     if pracc_ids:
                                         prval = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                         'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                        'amt': "{:.2f}".format(pracc_ids.pp_total) if pracc_ids.pp_total else "0.00",
+                                        'amount': "{:.2f}".format(pracc_ids.pp_total) if pracc_ids.pp_total else "0.00",
                                         'balance': "{:.2f}".format(pracc_ids.remain) if pracc_ids.remain else "0.00",
-                                        'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                        'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                         'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                         sal_det_lst.append(prval)
                                 elif c.record_detail_type == 'VOUCHER':
                                     voc_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
                                     'desc':c.dt_itemdesc,'qty':c.dt_qty,
-                                    'amt': "{:.2f}".format(c.dt_amt) if c.dt_amt else "0.00",'balance': "",
-                                    'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(c.dt_transacamt),
+                                    'amount': "{:.2f}".format(c.dt_amt) if c.dt_amt else "0.00",'balance': "",
+                                    'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
                                     'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
                                     sal_det_lst.append(voc_val)
                                 elif c.record_detail_type == 'PACKAGE':
+                                    ps_amount = 0; ps_balance = 0
                                     packhdrids = PackageHdr.objects.filter(code=c.dt_itemno[:-4]).first()
                                     if packhdrids:
                                         packdtlids = PackageDtl.objects.filter(package_code=packhdrids.code,isactive=True)
                                         if packdtlids:
+
+                                            ptracc_ids = list(set(TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                            dt_lineno=c.dt_lineno,cust_code=d.sa_custno).values_list('treatment_parentcode', flat=True).distinct()))
+                                            # print(ptracc_ids,"ptracc_ids")
+                                            if ptracc_ids:
+                                                for ps in ptracc_ids:
+                                                    psaccids = TreatmentAccount.objects.filter(ref_transacno=d.sa_transacno,
+                                                    treatment_parentcode=ps).order_by('-sa_date','-sa_time','-id').first()
+                                                    # print(psaccids,psaccids.pk,"psaccids")
+                                                    if psaccids and psaccids.amount >= 0:
+                                                        # print(psaccids.amount,"psaccids.amount")
+                                                        ps_amount += psaccids.amount
+                                                    if psaccids and psaccids.balance >= 0:
+                                                        # print(psaccids.balance,"psaccids.balance")
+                                                        ps_balance += psaccids.balance
+
+                                            psdep_acc = DepositAccount.objects.filter(cust_code=d.sa_custno,
+                                            type='Deposit',sa_transacno=d.sa_transacno,dt_lineno=c.dt_lineno).only('cust_code','type').order_by('pk')
+                                            if psdep_acc:
+                                                for pdst in psdep_acc:
+                                                    pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                        treat_code=pdst.treat_code).order_by('-sa_date','-sa_time','-id').first()
+                                                    # print(pdeacc_ids,pdeacc_ids.pk,"jj")
+                                                    if pdeacc_ids and pdeacc_ids.amount >= 0:
+                                                        ps_amount += pdeacc_ids.amount
+                                                        # print(pdeacc_ids.amount,"pdeacc_ids.amount")
+                                                    if pdeacc_ids and pdeacc_ids.balance >= 0:
+                                                        ps_balance += pdeacc_ids.balance
+                                                        # print(pdeacc_ids.balance,"pdeacc_ids.balance")
+
+
                                             for pad in packdtlids:
+                                                # print(pad,"pad")
                                                 packdtlcode = str(pad.code)
                                                 itmcode = packdtlcode[:-4]
                                                 itm_stock = Stock.objects.filter(item_code=itmcode).first()
@@ -15333,49 +15496,75 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                                                         p = pos_ids.first()
                                                         pa_trasac = p.price * p.qty
                                                         pa_deposit = p.deposit_amt
-                                                        if int(itm_stock.item_div) == 3:
-                                                            ptracc_ids = TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
-                                                            dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up','Sales']).order_by('-pk').first()
-                                                            if ptracc_ids:
-                                                                s_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                                'desc':pad.description,'qty':pad.qty,
-                                                                'amt': "{:.2f}".format(abs(ptracc_ids.amount)) if ptracc_ids.amount else "0.00",
-                                                                'balance': "{:.2f}".format(abs(ptracc_ids.balance)) if ptracc_ids.balance else "0.00",
-                                                                'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                                'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                                sal_det_lst.append(s_val)
-                                                        elif int(itm_stock.item_div) == 1:
-                                                            pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
-                                                            dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up']).order_by('-pk').first()
-                                                            if pdeacc_ids:
-                                                                r_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                                'desc':pad.description,'qty':pad.qty,
-                                                                'amt': "{:.2f}".format(abs(pdeacc_ids.amount)) if pdeacc_ids.amount else "0.00",
-                                                                'balance': "{:.2f}".format(abs(pdeacc_ids.balance)) if pdeacc_ids.balance else "0.00",
-                                                                'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                                'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                                sal_det_lst.append(r_val) 
-                                                        elif int(itm_stock.item_div) == 5:
-                                                            prep_acc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
-                                                            line_no=c.dt_lineno,sa_status__in=['DEPOSIT','TOPUP','SA']).order_by('-pk').first()
-                                                            if prep_acc_ids:
-                                                                pr_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                                'desc':pad.description,'qty':pad.qty,
-                                                                'amt': "{:.2f}".format(prep_acc_ids.pp_total) if prep_acc_ids.pp_total else "0.00",
-                                                                'balance': "{:.2f}".format(prep_acc_ids.remain) if prep_acc_ids.remain else "0.00",
-                                                                'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
-                                                                'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                                sal_det_lst.append(pr_val)
-                                                        elif int(itm_stock.item_div) == 4: 
-                                                            vo_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
-                                                            'desc':pad.description,'qty':pad.qty,
-                                                            'amt': "{:.2f}".format(pad.ttl_uprice) if pad.ttl_uprice else "0.00",
-                                                            'balance': "",'satransac_ref' : d.sa_transacno_ref,
-                                                            'amount': "{:.2f}".format(pa_trasac),
-                                                            'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
-                                                            sal_det_lst.append(vo_val)
 
+                                                        # if int(itm_stock.item_div) == 3:
+
+                                                            
+                                                            # ptracc_ids = TreatmentAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                            # dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up','Sales']).order_by('-pk').first()
+                                                            # if ptracc_ids:
+                                                            #     s_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                            #     'desc':pad.description,'qty':pad.qty,
+                                                            #     'amt': "{:.2f}".format(abs(ptracc_ids.amount)) if ptracc_ids.amount else "0.00",
+                                                            #     'balance': "{:.2f}".format(abs(ptracc_ids.balance)) if ptracc_ids.balance else "0.00",
+                                                            #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                            #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                            #     sal_det_lst.append(s_val)
+
+                                                        # elif int(itm_stock.item_div) == 1:
+
+                                                        
+                                                            # pdeacc_ids = DepositAccount.objects.filter(sa_transacno=d.sa_transacno,
+                                                            # dt_lineno=c.dt_lineno,type__in=['Deposit','Top Up']).order_by('-pk').first()
+                                                            # if pdeacc_ids:
+                                                            #     r_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                            #     'desc':pad.description,'qty':pad.qty,
+                                                            #     'amt': "{:.2f}".format(abs(pdeacc_ids.amount)) if pdeacc_ids.amount else "0.00",
+                                                            #     'balance': "{:.2f}".format(abs(pdeacc_ids.balance)) if pdeacc_ids.balance else "0.00",
+                                                            #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                            #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                            #     sal_det_lst.append(r_val) 
+
+                                                        if int(itm_stock.item_div) == 5:
+                                                            lst_preacc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
+                                                            status=True,line_no=c.dt_lineno,package_code_lineno=pad.line_no).order_by('-pk').only('pp_no','status','line_no').first()
+                                                            # print(lst_preacc_ids,lst_preacc_ids.pk,"kk")
+                                                            if lst_preacc_ids and lst_preacc_ids.pp_total >= 0:
+                                                                ps_amount += lst_preacc_ids.pp_amt
+                                                            if lst_preacc_ids and lst_preacc_ids.remain >= 0:
+                                                                ps_balance += lst_preacc_ids.remain
+
+                                                            # prep_acc_ids = PrepaidAccount.objects.filter(pp_no=d.sa_transacno,
+                                                            # line_no=c.dt_lineno,sa_status__in=['DEPOSIT','TOPUP','SA']).order_by('-pk').first()
+                                                            # if prep_acc_ids:
+                                                            #     pr_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                            #     'desc':pad.description,'qty':pad.qty,
+                                                            #     'amt': "{:.2f}".format(prep_acc_ids.pp_total) if prep_acc_ids.pp_total else "0.00",
+                                                            #     'balance': "{:.2f}".format(prep_acc_ids.remain) if prep_acc_ids.remain else "0.00",
+                                                            #     'satransac_ref' : d.sa_transacno_ref,'amount': "{:.2f}".format(pa_trasac),
+                                                            #     'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                            #     sal_det_lst.append(pr_val)
+                                                        elif int(itm_stock.item_div) == 4: 
+                                                            
+                                                            ps_amount += pad.price * pad.qty
+                                                            # print(pad.price * pad.qty,"pad.price")
+                                                            # vo_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                                            # 'desc':pad.description,'qty':pad.qty,
+                                                            # 'amt': "{:.2f}".format(pad.ttl_uprice) if pad.ttl_uprice else "0.00",
+                                                            # 'balance': "",'satransac_ref' : d.sa_transacno_ref,
+                                                            # 'amount': "{:.2f}".format(pa_trasac),
+                                                            # 'paid': "{:.2f}".format(pa_deposit),'outstanding': "{:.2f}".format((pa_trasac) - pa_deposit)}
+                                                            # sal_det_lst.append(vo_val)
+
+                                    d_val = {'cust_code':d.sa_custno,'cust_name': d.sa_custname,
+                                        'desc':c.dt_itemdesc,'qty':c.dt_qty,
+                                        'amount': "{:.2f}".format(abs(ps_amount)) if ps_amount else "0.00",
+                                        'balance': "{:.2f}".format(abs(ps_balance)) if ps_balance else "0.00",
+                                        'satransac_ref' : d.sa_transacno_ref,'amt': "{:.2f}".format(c.dt_transacamt),
+                                        'paid': "{:.2f}".format(c.dt_deposit),'outstanding': "{:.2f}".format(c.dt_transacamt - c.dt_deposit)}
+                                    sal_det_lst.append(d_val)  
                     
+                        
 
 
                         
@@ -15429,7 +15618,7 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                     # td_ids =  Treatment.objects.filter(status='Done',treatment_date__date=givendate,
                     # site_code=site.itemsite_code).order_by('-pk')  
                     td_ids =  Treatment.objects.filter(status='Done',treatment_date__date=givendate,
-                    site_code=site.itemsite_code).order_by('-pk')
+                    ).order_by('-pk')
                     for i in td_ids:
                         # print(i.treatment_code,i.sa_transacno,"i.treatment_code")
                         # haud_id = PosHaud.objects.filter(itemsite_code=site.itemsite_code,
@@ -15439,28 +15628,31 @@ class DayEndListAPIView(generics.ListAPIView,generics.CreateAPIView):
                         if haud_id and haud_id.sa_custnoid:
                             # cust_obj = Customer.objects.filter(cust_code=i.cust_code,cust_isactive=True).order_by('-pk').first()
                             # if cust_obj:
+                            # times=i.times,treatment_no=i.treatment_no
                             helper_ids = ItemHelper.objects.filter(item_code=i.treatment_code,sa_transacno=i.sa_transacno,
-                            times=i.times,treatment_no=i.treatment_no).order_by('-pk')
+                            site_code=site.itemsite_code).order_by('-pk')
                                 
-                            done_outlet = ""
+                            done_outlet = ""; td_sa_transacno_ref = ""
                             # helperids = ItemHelper.objects.filter(item_code=i.treatment_code,
                             # sa_transacno=i.sa_transacno).order_by('-pk').first()
                             # print(helperids,"helperids")
                             if helper_ids:
-                                haudid = PosHaud.objects.filter(isvoid=False,sa_transacno=helper_ids[0].helper_transacno).order_by('-pk').first()
+                                haudid = PosHaud.objects.filter(isvoid=False,sa_transacno=helper_ids[0].helper_transacno,
+                                ).order_by('-pk').first()
                                 # print(haudid,"haudid")
                                 if haudid:
+                                    td_sa_transacno_ref = haudid.sa_transacno_ref
                                     done_outlet = haudid.itemsite_code
 
-                            td_vals = {'treatment_done':haud_id.sa_transacno_ref,'desc':i.course,
-                                    'amount': "{:.2f}".format(i.unit_amount),'cust_name': haud_id.sa_custnoid.cust_name,
-                                    'cust_code': haud_id.sa_custnoid.cust_code,
-                                    'cust_refer': haud_id.sa_custnoid.cust_refer if haud_id.sa_custnoid.cust_refer else '',
-                                    'staff_name': ','.join(list(set([v.helper_name for v in helper_ids if v.helper_name]))),
-                                    'buy_treatment_outlet': haud_id.itemsite_code,
-                                    'treatmentdone_outlet': done_outlet,
-                                    'treatment_code': i.treatment_code}
-                            tdlst.append(td_vals)
+                                    td_vals = {'treatment_done':td_sa_transacno_ref,'desc':i.course,
+                                            'amount': "{:.2f}".format(i.unit_amount),'cust_name': haud_id.sa_custnoid.cust_name,
+                                            'cust_code': haud_id.sa_custnoid.cust_code,
+                                            'cust_refer': haud_id.sa_custnoid.cust_refer if haud_id.sa_custnoid.cust_refer else '',
+                                            'staff_name': ','.join(list(set([v.helper_name for v in helper_ids if v.helper_name]))),
+                                            'buy_treatment_outlet': haud_id.itemsite_code,
+                                            'treatmentdone_outlet': done_outlet,
+                                            'treatment_code': i.treatment_code}
+                                    tdlst.append(td_vals)
 
 
 
@@ -17463,6 +17655,14 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
             queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
         else:
             queryset = Customer.objects.filter(cust_isactive=True,site_code=site.itemsite_code).only('cust_isactive').order_by('-pk')
+        
+        asystem_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
+        value_name='Customeroutletrestrict',isactive=True).first()
+        if asystem_setup and asystem_setup.value_data == 'True':
+            queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
+        else:
+            queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
+        
 
         q = self.request.GET.get('search', None)
         value = self.request.GET.get('sortValue', None)
@@ -17733,7 +17933,12 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                             source = sou_obj.source_code
 
                     if not 'custallowsendsms' in request.data or request.data['custallowsendsms'] == None:
-                        allowsendsms = True
+                        allowsendsms = False
+                        custallowsendsms_setup = Systemsetup.objects.filter(title='custallowsendsms',
+                        value_name='custallowsendsms',isactive=True).first()
+                        if custallowsendsms_setup and custallowsendsms_setup.value_data == 'True':
+                            allowsendsms = True
+
                     else:
                         if 'custallowsendsms' in request.data and request.data['custallowsendsms']:
                             allowsendsms = request.data['custallowsendsms']
@@ -17750,12 +17955,30 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                         estimated_deliverydate=request.data['estimated_deliverydate'] if 'estimated_deliverydate' in request.data and request.data['estimated_deliverydate'] else None,
                                         no_of_weeks_pregnant=request.data['no_of_weeks_pregnant'] if 'no_of_weeks_pregnant' in request.data and request.data['no_of_weeks_pregnant'] else None,
                                         no_of_children=request.data['no_of_children'] if 'no_of_children' in request.data and request.data['no_of_children'] else None,
-                                        )
+                                        cust_postcode=request.data['cust_postcode'] if 'cust_postcode' in request.data and request.data['cust_postcode'] else None,
+                                        sgn_unitno=request.data['sgn_unitno'] if 'sgn_unitno' in request.data and request.data['sgn_unitno'] else None,
+                                        sgn_block=request.data['sgn_block'] if 'sgn_block' in request.data and request.data['sgn_block'] else None,
+                                        sgn_street=request.data['sgn_street'] if 'sgn_street' in request.data and request.data['sgn_street'] else None,
+                                        or_key=site.itemsite_code)
 
                     if 'cust_corporate' in request.data and request.data['cust_corporate']:
                         serializer.save(cust_corporate=request.data['cust_corporate'])
                     
-                    if request.data['cust_dob'] and request.data['cust_dob'] != str(date.today()):
+                    custdob_setup = Systemsetup.objects.filter(title='CustomerDOB',
+                    value_name='CustomerDOB',isactive=True).first()
+                    if custdob_setup and custdob_setup.value_data == 'True':
+                        if 'cust_dob' in request.data and request.data['cust_dob']:
+                            custdob = datetime.datetime.strptime(str(request.data['cust_dob']), "%Y-%m-%d")
+                            cust_rem = calculate(custdob)
+                            if cust_rem > 18:
+                                k.cust_dob = request.data['cust_dob']
+                                k.save()
+                            else:
+                                k.cust_dob = None
+                                k.save()
+
+                    
+                    if k.cust_dob and k.cust_dob != str(date.today()):
                         k.dob_status = True
                         k.save()
                                                 
@@ -17774,6 +17997,8 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                 mobile_phone=req['mobile_phone'],email=req['email'],
                                 customer_id=k) 
                                 cp.save()
+                        
+                       
 
                     if 'referredbyid' in request.data and request.data['referredbyid']:
                         ref_ids = CustomerReferral.objects.filter(cust_id__pk=k.pk,Site_Codeid__pk=site.pk)
@@ -17787,12 +18012,20 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                 k.cust_referby_code = custref_obj.cust_code
                                 k.save()           
 
+                    crefer_setup = Systemsetup.objects.filter(title='UpdateCustCodeToCustRefer',
+                    value_name='UpdateCustCodeToCustRefer',isactive=True).first()
+                    if crefer_setup and crefer_setup.value_data == 'True':
+                        if 'cust_refer' in request.data and not request.data['cust_refer']:
+                            k.cust_refer = cus_code
+                            k.save()
+
                     state = status.HTTP_201_CREATED
-                    message = "Created Succesfully "
+                    message = "Created Succesfully"
                     error = False
                     data = serializer.data
                     result = response(self, request, queryset, total, state, message, error, serializer_class, data,
                                     action=self.action)
+                   
                     return Response(result, status=status.HTTP_201_CREATED)
 
                 error = True
@@ -17937,11 +18170,20 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                     estimated_deliverydate=request.data['estimated_deliverydate'] if 'estimated_deliverydate' in request.data and request.data['estimated_deliverydate'] else None,
                     no_of_weeks_pregnant=request.data['no_of_weeks_pregnant'] if 'no_of_weeks_pregnant' in request.data and request.data['no_of_weeks_pregnant'] else None,
                     no_of_children=request.data['no_of_children'] if 'no_of_children' in request.data and request.data['no_of_children'] else None,
+                    cust_postcode=request.data['cust_postcode'] if 'cust_postcode' in request.data and request.data['cust_postcode'] else customer.cust_postcode,
+                    sgn_unitno=request.data['sgn_unitno'] if 'sgn_unitno' in request.data and request.data['sgn_unitno'] else customer.sgn_unitno,
+                    sgn_block=request.data['sgn_block'] if 'sgn_block' in request.data and request.data['sgn_block'] else customer.sgn_block,
+                    sgn_street=request.data['sgn_street'] if 'sgn_street' in request.data and request.data['sgn_street'] else customer.sgn_street,
                     )
 
                     if 'cust_corporate' in requestData and requestData['cust_corporate']:
                         customer.cust_corporate = requestData['cust_corporate']
                         customer.save()
+
+                    if request.data['cust_dob'] and request.data['cust_dob'] != str(date.today()):
+                        customer.dob_status = True
+                        customer.save()
+
                     state = status.HTTP_200_OK
                     message = "Updated Succesfully"
                     error = False
@@ -17950,6 +18192,8 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                     CustLogAudit(customer_id=customer,cust_code=customer.cust_code,
                     username=fmspw.pw_userlogin,
                     user_loginid=fmspw,updated_at=timezone.now()).save()
+
+                  
 
                     if 'referredbyid' in request.data and request.data['referredbyid']:
                         ref_ids = CustomerReferral.objects.filter(cust_id__pk=customer.pk,Site_Codeid__pk=site.pk)
@@ -20946,7 +21190,6 @@ class StripeCustomerCreateAPIView(GenericAPIView):
                     customer = stripe.Customer.create(name=customer_name,
                     email=email,phone=phone)
                     extra_msg = "Customer Created Succesfully"
-
                     if cust_obj:
                         cust_obj.stripe_id = customer.id
                         cust_obj.save()
@@ -23873,3 +24116,687 @@ class SitelistipViewset(viewsets.ModelViewSet):
             return sitelistip.objects.get(pk=pk)
         except sitelistip.DoesNotExist:
             raise Exception('sitelistip Does not Exist') 
+
+class DisplayCatalogViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = DisplayCatalog.objects.filter(isactive=True).order_by('seqnumber')
+    serializer_class = DisplayCatalogSerializer
+
+    def get_queryset(self):
+        fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+        site = fmspw[0].loginsite
+        queryset = DisplayCatalog.objects.filter(isactive=True).order_by('seqnumber')
+       
+        return queryset
+
+    def list(self, request):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+            site = fmspw[0].loginsite
+            serializer_class = DisplayCatalogSerializer
+            
+            queryset = self.filter_queryset(self.get_queryset())
+
+            total = len(queryset)
+            state = status.HTTP_200_OK
+            message = "Listed Succesfully"
+            error = False
+            data = None
+            result=response(self,request, queryset,total,  state, message, error, serializer_class, data, action=self.action)
+            return Response(result, status=status.HTTP_200_OK) 
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+
+    
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated & authenticated_only],
+    authentication_classes=[TokenAuthentication])
+    def view(self, request): 
+        try:
+          
+            queryset = DisplayCatalog.objects.filter(isactive=True, 
+            parent_code__isnull=True).order_by('seqnumber')
+
+            # print(len(queryset),"queryset")
+              
+            final  = [] 
+            if queryset:
+                level1 = "Level 1"; 
+
+                for i in queryset:
+                    l1_lst = []
+
+                    level1_ids =  DisplayCatalog.objects.filter(isactive=True,
+                    parent_code=i.menu_code).order_by('seqnumber')
+
+                    level2 = "Level 2" ; 
+
+                    for j in level1_ids:
+                        l2_lst = []
+
+
+                        level2_ids = DisplayCatalog.objects.filter(isactive=True,
+                        parent_code=j.menu_code).order_by('seqnumber')
+
+                        level3 = "Level 3" ; 
+
+                        for k in level2_ids:
+                            l3_lst = []
+
+                            level3_ids = DisplayCatalog.objects.filter(isactive=True,
+                            parent_code=k.menu_code).order_by('seqnumber')
+
+                            level4 = "Level 4" ;
+
+                            for l in level3_ids:
+                                l4_lst = []
+                                level4_ids = DisplayCatalog.objects.filter(isactive=True,
+                                parent_code=l.menu_code).order_by('seqnumber')
+
+                                level5 = "Level 5" ;
+
+                                for m in level4_ids:
+                                    l5_lst = []
+
+                                    level5_ids = DisplayCatalog.objects.filter(isactive=True,
+                                    parent_code=m.menu_code).order_by('seqnumber')
+
+                                    level6 = "Level 6" ;
+
+                                    val5 = {'menuCode': m.menu_code,'menuDescription': m.menu_description, 
+                                    'parentCode': m.parent_code,'bgcolor': m.bgcolor,'seqnumber': m.seqnumber,
+                                    'image': str(SITE_ROOT) + str(m.imagepath) if m.imagepath else "" ,'child': l5_lst}
+                                    l4_lst.append(val5)
+
+
+                                val4 = {'menuCode': l.menu_code,'menuDescription': l.menu_description, 
+                                'parentCode': l.parent_code,'bgcolor': l.bgcolor,'seqnumber': l.seqnumber,
+                                'image': str(SITE_ROOT) + str(l.imagepath) if l.imagepath else "" , 'child': l4_lst}
+                                l3_lst.append(val4)
+
+
+                            val3 = {'menuCode': k.menu_code,'menuDescription': k.menu_description, 
+                            'parentCode': k.parent_code,'bgcolor': k.bgcolor,'seqnumber': k.seqnumber,
+                            'image': str(SITE_ROOT) + str(k.imagepath) if k.imagepath else "" , 'child': l3_lst}
+                            l2_lst.append(val3)
+
+
+                        val2 =  {'menuCode': j.menu_code,'menuDescription': j.menu_description, 
+                        'parentCode': j.parent_code,'bgcolor': j.bgcolor,'seqnumber': j.seqnumber,
+                        'image': str(SITE_ROOT) + str(j.imagepath) if j.imagepath else "" , 'child': l2_lst}
+                        l1_lst.append(val2)
+
+
+                    val1 = {'menuCode':  i.menu_code,'menuDescription': i.menu_description,
+                    'parentCode': i.parent_code,'bgcolor': i.bgcolor,'seqnumber': i.seqnumber,
+                    'image': str(SITE_ROOT) + str(i.imagepath) if i.imagepath else "" ,  'child': l1_lst}
+                    final.append(val1)
+
+            
+
+
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully ",
+            'error': False, 'data': final}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+           invalid_message = str(e)
+           return general_error_response(invalid_message) 
+  
+
+    @transaction.atomic
+    def create(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+                site = fmspw[0].loginsite
+
+                if not 'menu_code' in request.data or not request.data['menu_code']:
+                    raise Exception('Please give menu code!!.') 
+
+                # if not 'parent_code' in request.data or not request.data['parent_code']:
+                #     raise Exception('Please give parent code!!.')
+
+                if not 'menu_description' in request.data or not request.data['menu_description']:
+                    raise Exception('Please give menudescription!!.')
+                
+                check_ids = DisplayCatalog.objects.filter(menu_code=request.data['menu_code'])
+                if check_ids:
+                    msg = "{0} already this record exist active / inactive!!".format(str(request.data['menu_code']))
+                    raise Exception(msg) 
+                    
+
+                serializer = DisplayCatalogSerializer(data=request.data)
+                if serializer.is_valid():
+                    
+                    k = serializer.save(isactive=True)
+                   
+                    result = {'status': status.HTTP_201_CREATED,"message":"Created Succesfully",
+                    'error': False}
+                    return Response(result, status=status.HTTP_201_CREATED)
+                
+
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+    
+    @transaction.atomic
+    def update(self, request, pk=None):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+                site = fmspw.loginsite
+                ref = self.get_object(pk)
+                if not 'menu_code' in request.data or not request.data['menu_code']:
+                    raise Exception('Please give menu code!!.') 
+
+                # if not 'parent_code' in request.data or not request.data['parent_code']:
+                #     raise Exception('Please give parent code!!.')
+
+                if not 'menu_description' in request.data or not request.data['menu_description']:
+                    raise Exception('Please give menudescription!!.')
+                
+                check_ids = DisplayCatalog.objects.filter(~Q(pk=ref.pk)).filter(menu_code=request.data['menu_code']).order_by('-pk')
+                if check_ids:
+                    msg = "{0} already this record exist active/inactive!!".format(str(request.data['menu_code']))
+                    raise Exception(msg) 
+                    
+                serializer = self.get_serializer(ref, data=request.data)
+                if serializer.is_valid():
+                
+                    serializer.save()
+                    
+                    result = {'status': status.HTTP_200_OK,"message":"Updated Succesfully",'error': False}
+                    return Response(result, status=status.HTTP_200_OK)
+
+                
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)   
+    
+    def retrieve(self, request, pk=None):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+            site = fmspw.loginsite
+            ref = self.get_object(pk)
+            serializer = DisplayCatalogSerializer(ref, context={'request': self.request})
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': serializer.data}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+
+   
+    def destroy(self, request, pk=None):
+        try:
+            request.data["isactive"] = False
+            ref = self.get_object(pk)
+            serializer = DisplayCatalogSerializer(ref, data=request.data ,partial=True)
+            state = status.HTTP_204_NO_CONTENT
+            if serializer.is_valid():
+                serializer.save()
+                result = {'status': status.HTTP_200_OK,"message":"Deleted Succesfully",'error': False}
+                return Response(result, status=status.HTTP_200_OK)
+            
+            # print(serializer.errors,"jj")
+            result = {'status': status.HTTP_204_NO_CONTENT,"message":"No Content",
+            'error': True,'data': serializer.errors }
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)          
+
+
+    def get_object(self, pk):
+        try:
+            return DisplayCatalog.objects.get(pk=pk)
+        except DisplayCatalog.DoesNotExist:
+            raise Exception('DisplayCatalog Does not Exist') 
+        
+class DisplayItemViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = []
+    serializer_class = []
+
+    def get_queryset(self):
+        fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+        site = fmspw[0].loginsite
+        menucode = self.request.GET.get('menucode',None)
+
+        queryset = list(set(DisplayItem.objects.filter(menu_code=menucode).values_list('stockid', flat=True).distinct()))
+        
+        systemids = Systemsetup.objects.filter(title='stockOrderBy',
+            value_name='stockOrderBy',isactive=True).first()
+
+
+        if systemids and systemids.value_data == 'item_name':
+            squeryset = Stock.objects.filter(item_isactive=True,pk__in=queryset).order_by('item_name') 
+        elif systemids and systemids.value_data == 'item_seq':
+            squeryset = Stock.objects.filter(item_isactive=True,pk__in=queryset).order_by('item_seq')
+        elif systemids and systemids.value_data == 'item_desc':
+            squeryset = Stock.objects.filter(item_isactive=True,pk__in=queryset).order_by('item_desc')
+        elif systemids and systemids.value_data == 'item_code':
+            squeryset = Stock.objects.filter(item_isactive=True,pk__in=queryset).order_by('item_code')
+        else:
+            squeryset = Stock.objects.filter(item_isactive=True,pk__in=queryset).order_by('item_name') 
+        
+        
+        return squeryset
+
+    def list(self, request):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+            site = fmspw[0].loginsite
+
+            menucode = request.GET.get('menucode',None)
+            if not menucode:
+                raise Exception('Please give Menucode!!') 
+
+            serializer_class = DisplayItemStockSerializer
+            
+            queryset = self.filter_queryset(self.get_queryset())
+            page= request.GET.get('page',1)
+            limit = request.GET.get('limit',12)
+            full_tot = queryset.count()
+            paginator = Paginator(queryset, limit)
+            total_page = paginator.num_pages
+
+            if int(page) > total_page:
+                result = {'status': status.HTTP_200_OK,"message":"No Content",'error': False, 
+                'data': {'meta': {'pagination': {"per_page":limit,"current_page":page,"total":full_tot,"total_pages":total_page}}, 
+                'dataList': []}}
+                return Response(result, status=status.HTTP_200_OK)
+
+            try:
+                queryset = paginator.page(page)
+            except (EmptyPage, InvalidPage):
+                queryset = paginator.page(total_page) # last page
+
+            
+            serializer = DisplayItemStockSerializer(queryset, many=True, context={'request': self.request,'menucode': menucode})
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': {'meta': {'pagination': {"per_page":limit,"current_page":page,"total":full_tot,"total_pages":total_page}}, 
+            'dataList': serializer.data}}
+            
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+    
+
+    @transaction.atomic
+    def create(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+                site = fmspw[0].loginsite
+
+                if not 'menu_code' in request.data or not request.data['menu_code']:
+                    raise Exception('Please give menu code!!.') 
+
+                if not 'stockid' in request.data or not request.data['stockid']:
+                    raise Exception('Please give stockid!!.')
+
+               
+                check_ids = DisplayItem.objects.filter(menu_code=request.data['menu_code'],
+                stockid=request.data['stockid'])
+
+            
+                if check_ids:
+                    msg = "Menu code {0}, Stockid {1} already record exist !!".format(str(request.data['menu_code']),str(request.data['stockid']))
+                    raise Exception(msg)
+
+                # scheck_ids = DisplayItem.objects.filter(stockid=request.data['stockid'])
+                # if scheck_ids:
+                #     msg = "Stockid {0} already record exist !!".format(str(request.data['stockid']))
+                #     raise Exception(msg)
+     
+                    
+
+                serializer = DisplayItemSerializer(data=request.data)
+                if serializer.is_valid():
+                    
+                    k = serializer.save()
+                   
+                    result = {'status': status.HTTP_201_CREATED,"message":"Created Succesfully",
+                    'error': False}
+                    return Response(result, status=status.HTTP_201_CREATED)
+                
+
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+    
+    @transaction.atomic
+    def update(self, request, pk=None):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+                site = fmspw.loginsite
+                ref = self.get_object(pk)
+                if not 'menu_code' in request.data or not request.data['menu_code']:
+                    raise Exception('Please give menu code!!.') 
+
+                
+                if not 'stockid' in request.data or not request.data['stockid']:
+                    raise Exception('Please give stockid!!.')
+
+                check_ids = DisplayItem.objects.filter(~Q(pk=ref.pk)).filter(menu_code=request.data['menu_code'],
+                stockid=request.data['stockid']).order_by('-pk')
+                if check_ids:
+                    msg = "Menu code {0}, Stockid {1} already record exist !!".format(str(request.data['menu_code']),str(request.data['stockid']))
+                    raise Exception(msg)
+
+                # scheck_ids = DisplayItem.objects.filter(~Q(pk=ref.pk)).filter(
+                # stockid=request.data['stockid']).order_by('-pk')
+                # if scheck_ids:
+                #     msg = "Stockid {0} already record exist !!".format(str(request.data['stockid']))
+                #     raise Exception(msg) 
+                        
+                    
+                serializer = DisplayItemSerializer(ref, data=request.data)
+                if serializer.is_valid():
+                
+                    serializer.save()
+                    
+                    result = {'status': status.HTTP_200_OK,"message":"Updated Succesfully",'error': False}
+                    return Response(result, status=status.HTTP_200_OK)
+
+                
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)   
+
+    def retrieve(self, request, pk=None):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+            site = fmspw.loginsite
+            ref = self.get_object(pk)
+            serializer = DisplayItemSerializer(ref, context={'request': self.request})
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': serializer.data}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+
+   
+    def destroy(self, request, pk=None):
+        try:
+            ref = self.get_object(pk)
+            serializer = DisplayItemSerializer(ref, data=request.data ,partial=True)
+            state = status.HTTP_204_NO_CONTENT
+            if serializer.is_valid():
+                ref.delete()
+                result = {'status': status.HTTP_200_OK,"message":"Deleted Succesfully",'error': False}
+                return Response(result, status=status.HTTP_200_OK)
+            
+            # print(serializer.errors,"jj")
+            result = {'status': status.HTTP_204_NO_CONTENT,"message":"No Content",
+            'error': True,'data': serializer.errors }
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)          
+
+
+    def get_object(self, pk):
+        try:
+            return DisplayItem.objects.get(pk=pk)
+        except DisplayItem.DoesNotExist:
+            raise Exception('DisplayItem ID Does not Exist') 
+            
+
+class OutletRequestCustomerViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = []
+    serializer_class = []
+
+    def list(self, request):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+            site = fmspw[0].loginsite
+
+            given_date = request.GET.get('given_date',None)
+            if not given_date:
+                raise Exception('Please give date!!') 
+
+            total_ids = OutletRequestLog.objects.filter(log_date__date=given_date,
+            requesting_site=site.itemsite_code).order_by('-pk')
+    
+
+            waiting_ids = OutletRequestLog.objects.filter(log_date__date=given_date,
+            requesting_site=site.itemsite_code,req_status='Waiting').order_by('-pk').count()
+
+            approved_ids = OutletRequestLog.objects.filter(log_date__date=given_date,
+            requesting_site=site.itemsite_code,req_status='Approved').order_by('-pk').count()
+
+            rejected_ids = OutletRequestLog.objects.filter(log_date__date=given_date,
+            requesting_site=site.itemsite_code,req_status='Rejected').order_by('-pk').count()
+
+            serializer = OutletRequestLogSerializer(total_ids, context={'request': self.request}, many=True) 
+            count_data = {'requests': total_ids.count(),'approved_count': approved_ids,
+            'rejected_count': rejected_ids,'pending_count': waiting_ids}
+            data = {'list_data':  serializer.data }
+            data.update(count_data)
+
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': data}
+            return Response(data=result, status=status.HTTP_200_OK)
+
+          
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated & authenticated_only],
+    authentication_classes=[TokenAuthentication])
+    def waitingloglist(self, request, pk=None):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+            site = fmspw[0].loginsite
+
+            given_date = request.GET.get('given_date',None)
+            if not given_date:
+                raise Exception('Please give date!!') 
+
+            waiting_ids = OutletRequestLog.objects.filter(log_date__date=given_date,
+            from_site=site.itemsite_code,req_status='Waiting').order_by('-pk')
+
+            serializer = OutletRequestLogSerializer(waiting_ids, context={'request': self.request}, many=True) 
+            
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': serializer.data}
+            return Response(data=result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+           invalid_message = str(e)
+           return general_error_response(invalid_message)     
+    
+    @transaction.atomic
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated & authenticated_only],
+    authentication_classes=[TokenAuthentication])
+    def waitingapproval(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+                
+                site = fmspw.loginsite
+
+                if not 'log_id' in request.data or not request.data['log_id']:
+                    raise Exception('Please give OutletRequestLog log_id !!.') 
+                
+                log_id = request.data['log_id']
+                log_obj = OutletRequestLog.objects.filter(pk=log_id).first()
+                if not log_obj:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"OutletRequestLog id Does't Exist!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+
+                if not 'req_status' in request.data or not request.data['req_status']:
+                    raise Exception('Please give request status!!.') 
+
+                cust_obj = Customer.objects.filter(cust_code=log_obj.cust_code,cust_isactive=True).first()
+                if not cust_obj:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Customer id Does't Exist!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+
+                
+                if request.data['req_status'] == "Approved":
+                
+                    cust_obj.or_key = log_obj.requesting_site
+                    cust_obj.save()
+                    log_obj.req_status = "Approved"
+                    log_obj.save()
+                    result = {'status': status.HTTP_200_OK,
+                    "message":"Customer {0} Transferred to this {1} outlet approved Succesfully".format(str(cust_obj.cust_name),str(log_obj.requesting_site)),
+                    'error': False}
+                    return Response(data=result, status=status.HTTP_200_OK)
+                elif request.data['req_status'] == "Rejected":
+                    log_obj.req_status = "Rejected"
+                    log_obj.save()
+                    result = {'status': status.HTTP_200_OK,
+                    "message":"Customer {0} Transferred to this {1} outlet is rejected".format(str(cust_obj.cust_name),str(log_obj.requesting_site)),
+                    'error': False}
+                    return Response(data=result, status=status.HTTP_200_OK) 
+                else:
+                    raise Exception('Please give request status Approved/Rejected!!.')
+
+        except Exception as e:
+           invalid_message = str(e)
+           return general_error_response(invalid_message)     
+     
+
+    @transaction.atomic
+    def create(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+                site = fmspw.loginsite
+
+                if not 'cust_id' in request.data or not request.data['cust_id']:
+                    raise Exception('Please give Customer id!!.') 
+
+                cust_id = request.data['cust_id']
+                # if not 'site_id' in request.data or not request.data['site_id']:
+                #     raise Exception('Please give Site id!!.')
+                # site_id = request.data['site_id']
+                cust_obj = Customer.objects.filter(pk=cust_id,cust_isactive=True).first()
+                if not cust_obj:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Customer id Does't Exist!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+                # site_obj = ItemSitelist.objects.filter(pk=site_id,itemsite_isactive=True).order_by('-pk').first()
+                # if not site_obj:
+                #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Site id Does't Exist!!",'error': True} 
+                #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+                
+                haud_ids =  PosHaud.objects.filter(isvoid=False,sa_custno=cust_obj.cust_code,
+                itemsite_code=site.itemsite_code).order_by("-pk").first()
+
+                check_ids = OutletRequestLog.objects.filter(log_date__date=date.today(),
+                cust_code=cust_obj.cust_code,requesting_site=site.itemsite_code)
+                if check_ids:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,
+                    "message":"Already Customer Request created for this given site!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+                
+                # print(date.today(),"date.today()")
+                asystem_setup = Systemsetup.objects.filter(title='outletrequestmanualrelease',
+                value_name='outletrequestmanualrelease',isactive=True).first()
+                if asystem_setup and asystem_setup.value_data == 'True':
+                    log =OutletRequestLog(log_date=date.today(),cust_code=cust_obj.cust_code,cust_name=cust_obj.cust_name,
+                    from_site=cust_obj.or_key,requesting_site=site.itemsite_code,
+                    last_transaction=haud_ids.sa_transacno if haud_ids and haud_ids.sa_transacno else "",
+                    request_by=fmspw.pw_userlogin,
+                    req_date=date.today(),req_status="Waiting",req_staff_code=fmspw.Emp_Codeid.emp_code)
+                    log.save()
+                    # print(log,"log")
+                    if haud_ids and haud_ids.sa_date:
+                        log.last_transaction_date = haud_ids.sa_date
+                        log.save()
+
+                    result = {'status': status.HTTP_200_OK,
+                    "message":"Your Customer Request has been forwarded to {0} outlet and Waiting for approval".format(str(site.itemsite_code)),
+                    'error': False}
+                    return Response(data=result, status=status.HTTP_200_OK)
+                    
+                else:
+                    log =OutletRequestLog(log_date=date.today(),cust_code=cust_obj.cust_code,cust_name=cust_obj.cust_name,
+                    from_site=cust_obj.or_key,requesting_site=site.itemsite_code,
+                    last_transaction=haud_ids.sa_transacno if haud_ids and haud_ids.sa_transacno else "",
+                    request_by=fmspw.pw_userlogin,
+                    req_date=date.today(),req_status="Auto",req_staff_code=fmspw.Emp_Codeid.emp_code)
+                    log.save()
+                    if haud_ids and haud_ids.sa_date:
+                        log.last_transaction_date = haud_ids.sa_date
+                        log.save()
+
+                    cust_obj.or_key = site.itemsite_code
+                    cust_obj.save()
+                    result = {'status': status.HTTP_200_OK,"message":"Customer Transferred to this {0} outlet".format(str(site.itemsite_code)),
+                    'error': False}
+                    return Response(data=result, status=status.HTTP_200_OK)
+                 
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+    
+           
+
+
