@@ -1,0 +1,12 @@
+models compare
+cl_table / views.py
+
+Direct Replace modules
+cl_ipad
+cl_reports 
+clpayroll 
+
+keep Migration,models.py,__pycache__ , replace remanining files and compare models.py for each modules
+cl_table - views.py compare no replace
+cl_app
+custom

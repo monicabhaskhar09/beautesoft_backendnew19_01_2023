@@ -199,7 +199,7 @@ def GeneratePDF(self,request, sa_transacno):
         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)   
     
     tot_qty = 0;tot_trans = 0 ; tot_depo = 0; tot_bal = 0;balance = 0;tot_price = 0;tot_disc =0
-    total_netprice = 0
+    total_netprice = 0;tot_dt_price = 0
     dtl_serializer = PosdaudSerializer(daud, many=True)
     dtl_data = dtl_serializer.data
     for dat in dtl_data:
@@ -231,6 +231,7 @@ def GeneratePDF(self,request, sa_transacno):
             tot_bal += float(balance)
             
         tot_qty += int(d['dt_qty'])
+        tot_dt_price += d_obj.dt_price
         totdisc = d_obj.dt_price - d_obj.dt_promoprice
         tot_disc += totdisc
         
@@ -304,7 +305,8 @@ def GeneratePDF(self,request, sa_transacno):
     'subtotal':str("{:.2f}".format((tot_depo))),'billing_amount':"{:.2f}".format(float(tot_payamt)),
     'tot_disc':str("{:.2f}".format((tot_disc))),
     'pay_gst':str("{:.2f}".format(tot_gst)) if tot_gst else "0.00",
-    'taxable':  str("{:.2f}".format(taxable)) if taxable else "0.00"
+    'taxable':  str("{:.2f}".format(taxable)) if taxable else "0.00",
+    'tot_dt_price' : tot_dt_price,
     }
 
     split = str(hdr[0].sa_date).split(" ")
@@ -429,6 +431,21 @@ def GeneratePDF(self,request, sa_transacno):
             cval = {'creditnote_no':ce.credit_code,'balance':"{:.2f}".format(ce.balance) if ce.balance else "0.00"}
             creditlst.append(cval)
 
+    discreason_setup = Systemsetup.objects.filter(title='Invoice show discount reason',
+    value_name='Invoice show discount reason',isactive=True).first()
+    if discreason_setup and discreason_setup.value_data == 'True':
+        discreason = True
+    else:
+        discreason = False 
+
+    discper_setup = Systemsetup.objects.filter(title='Invoice show discount % $',
+    value_name='Invoice show discount % $',isactive=True).first()
+    if discper_setup and discper_setup.value_data == 'True':
+        discper = True
+    else:
+        discper = False        
+           
+
     custbal = customer_balanceoutstanding(self,request, hdr[0].sa_custno)
     # print(custbal,"custbal")
     # print(treatopen_ids,"treatopen_ids")
@@ -454,6 +471,7 @@ def GeneratePDF(self,request, sa_transacno):
     'gstlable': gstlable,'trans_promo1': title.trans_promo1 if title and title.trans_promo1 else '',
     'trans_promo2' : title.trans_promo2 if title and title.trans_promo2 else '',
     'voucher_lst':voucher_lst,'voucherbal':voucherbal,
+    'discreason': discreason,'discper' : discper,
     }
     data.update(sub_data)
     data.update(custbal)

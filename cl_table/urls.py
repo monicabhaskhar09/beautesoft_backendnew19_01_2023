@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from . import views
 
+
 router = DefaultRouter()
 router.register(r'termsandcondition', views.TermsandconditionViewset, basename='termsandcondition')
 router.register(r'participants', views.ParticipantsViewset, basename='participants')
@@ -78,7 +79,7 @@ urlpatterns = [
     path('api/EmployeeSecuritySettings/', views.EmployeeSecuritySettings.as_view(), name='EmployeeSecuritySettings'),
     path('api/IndividualEmpSettings/<int:emp_no>', views.IndividualEmpSettings.as_view(), name='IndividualEmpSettings'),
     path('api/EmployeeLevelsSettings/', views.EmployeeLevelsSettings, name='EmployeeLevelsSettings'),
-    path('api/MultiLanguage/', views.MultiLanguage, name='MultiLanguage'),
+    path('api/MultiLanguage/', views.MultiLanguage.as_view(), name='MultiLanguage'),
     path('api/MultiLanguageList/', views.MultiLanguage_list, name='MultiLanguage_list'),
     path('api/EmployeeLevels/', views.EmployeeLevels, name='EmployeeLevels'),
     path('api/DailySales/', views.DailySalesView.as_view(), name='DailySales'),
@@ -126,5 +127,9 @@ urlpatterns = [
     path('api/tmptreatmentnewservice/<int:pk>/', views.TmpTreatmentNewServiceAPIView.as_view(), name='tmptreatmentnewservice'),
     path('api/customerinvoicetemplateupload/', views.customerinvoicetemplateupload.as_view(), name='customerinvoicetemplateupload'),
     path('api/customerinvoicetemplatefiledownload/', views.customerinvoicetemplatefiledownload.as_view(), name='customerinvoicetemplatefiledownload'),
+    path('api/prepaidvalidperiod/', views.PrepaidValidperiodAPIView.as_view(), name='prepaidvalidperiod'),
+    path('api/customerreceiptprintbeforecheckout/', views.CustomerReceiptPrintBeforeCheckoutList.as_view(), name='customerreceiptprintbeforecheckout'),
+    path('api/availableservicetimeslots/', views.AvailableTimeSlotsAPIView.as_view(), name='availableservicetimeslots'),
+
 
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

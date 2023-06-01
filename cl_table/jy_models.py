@@ -715,6 +715,7 @@ class Employee(models.Model):
 
     class Meta:
         db_table = 'Employee'
+        # unique_together = (('emp_name'),)
         # unique_together = [['emp_name','emp_phone1']]
 
     def __str__(self):
@@ -886,7 +887,7 @@ class Fmspw(models.Model):
     # flgcatalog = models.BooleanField(db_column='flgcatalog',default=False)  # Field name made lowercase.
     # flgtcm = models.BooleanField(db_column='flgtcm',default=False)  # Field name made lowercase.
     flgpayroll = models.BooleanField(db_column='flgpayroll',default=False)  # Field name made lowercase.
-    # flginvoices = models.BooleanField(db_column='flginvoices',default=False)  # Field name made lowercase.
+    flginvoicedate = models.BooleanField(db_column='flginvoicedate',default=False)  # Field name made lowercase.
     flgstaff =  models.BooleanField(db_column='flgstaff',default=False)  # Field name made lowercase.
     # flginventory = models.BooleanField(db_column='flginventory',default=False)  # Field name made lowercase.
     # flgdayend = models.BooleanField(db_column='flgdayend',default=False)  # Field name made lowercase.
@@ -898,6 +899,7 @@ class Fmspw(models.Model):
     # flgquantum = models.BooleanField(db_column='flgquantum',default=False)  # Field name made lowercase.
     # flgbilling = models.BooleanField(db_column='flgbilling',default=False)  # Field name made lowercase.
     flgservicelimit = models.BooleanField(db_column='flgservicelimit',default=False)  # Field name made lowercase.
+    flgpayment = models.BooleanField(db_column='flgPayment',default=False)  # Field name made lowercase.
 
     class Meta:
         db_table = 'FMSPW'
@@ -1097,7 +1099,7 @@ class Customer(models.Model):
     no_of_weeks_pregnant = models.IntegerField(db_column='NoOfWeeksOfPregnancy', blank=True, null=True)  # Field name made lowercase.
     no_of_children = models.IntegerField(db_column='NoOfChildren', blank=True, null=True)  # Field name made lowercase.
     # customerextend = models.ForeignKey('cl_table.CustomerExtended', on_delete=models.PROTECT, null=True)
-
+  
     def save(self, *args,**kwargs):
         if self.Cust_Classid:
             self.cust_class = self.Cust_Classid.class_code
@@ -1248,7 +1250,9 @@ class CustomerExtended(models.Model):
     last_visit =  models.DateTimeField(null=True)
     upcoming_appointments = models.CharField(max_length=1000, null=True)
     class_name = models.CharField(max_length=40, blank=True, null=True)
+    original_sitecode = models.CharField(db_column='Original_SiteCode', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
+  
     # def save(self, *args,**kwargs):
     #     if self.Cust_Classid:
     #         self.cust_class = self.Cust_Classid.class_code
@@ -1258,7 +1262,7 @@ class CustomerExtended(models.Model):
         db_table = 'CustomerExtended'
         # unique_together = (('cust_code','cust_email','cust_phone1'),)
         # unique_together = (('cust_code','cust_email','cust_phone1','cust_phone2'),)
-        # unique_together = (('cust_code'),)
+        unique_together = (('cust_code','cust_name'),)
 
 
     def __str__(self):
@@ -1503,7 +1507,8 @@ class PrepaidAccount(models.Model):
     Site_Codeid = models.ForeignKey('cl_app.ItemSitelist', on_delete=models.PROTECT, null=True)
     Item_Codeid = models.ForeignKey('cl_table.Stock', on_delete=models.PROTECT, null=True) 
     item_code = models.CharField(db_column='Item_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    
+    terminate_prepaid = models.BooleanField(default=False)  # Field name made lowercase.
+
     class Meta:
         db_table = 'Prepaid_Account'
         # unique_together = (('pp_no', 'pp_type', 'transac_no', 'item_no', 'use_amt', 'remain', 'site_code', 'topup_no', 'line_no', 'edit_date'),)
@@ -1570,8 +1575,8 @@ class PrepaidAccountCondition(models.Model):
     pp_desc = models.CharField(db_column='PP_DESC', max_length=50, blank=True, null=True)  # Field name made lowercase.
     p_itemtype = models.CharField(db_column='P_ItemType', max_length=50, null=True)  # Field name made lowercase.
     item_code = models.CharField(max_length=20, null=True)
-    conditiontype1 = models.CharField(db_column='ConditionType1', max_length=20, null=True)  # Field name made lowercase.
-    conditiontype2 = models.CharField(db_column='ConditionType2', max_length=20, null=True)  # Field name made lowercase.
+    conditiontype1 = models.CharField(db_column='ConditionType1', max_length=80, null=True)  # Field name made lowercase.
+    conditiontype2 = models.CharField(db_column='ConditionType2', max_length=80, null=True)  # Field name made lowercase.
     amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     rate = models.CharField(db_column='Rate', max_length=20, blank=True, null=True)  # Field name made lowercase.
     membercardnoaccess = models.BooleanField(db_column='MemberCardNoAccess', null=True)  # Field name made lowercase.
@@ -1585,6 +1590,8 @@ class PrepaidAccountCondition(models.Model):
     creditvalueshared = models.BooleanField(db_column='CreditValueShared', null=True)  # Field name made lowercase.
     updated_at = models.DateTimeField(default=timezone.now, null=True)
     created_at = models.DateTimeField(default=timezone.now, null=True)
+    itemdept_id = models.IntegerField(db_column='itemdept_id', blank=True, null=True)  # Field name made lowercase.
+    itembrand_id = models.IntegerField(db_column='itembrand_id', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         db_table = 'Prepaid_Account_Condition'
@@ -1602,8 +1609,8 @@ class VoucherCondition(models.Model):
     amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     rate = models.CharField(db_column='Rate', max_length=10, blank=True, null=True)  # Field name made lowercase.
     membercardnoaccess = models.BooleanField(db_column='MemberCardNoAccess', blank=True, null=True)  # Field name made lowercase.
-    # line_no = models.IntegerField(db_column='Line_No', blank=True, null=True)  # Field name made lowercase.
-    # isactive = models.BooleanField(db_column='IsActive')  # Field name made lowercase.
+    line_no = models.IntegerField(db_column='Line_No', blank=True, null=True)  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='IsActive',default=True)  # Field name made lowercase.
 
     class Meta:
         db_table = 'Voucher_condition' 
@@ -1863,7 +1870,7 @@ class PosDaud(models.Model):
     dt_qty = models.IntegerField(blank=True, null=True)
     dt_discamt = models.FloatField(db_column='dt_discAmt', blank=True, null=True)  # Field name made lowercase.
     dt_discpercent = models.FloatField(db_column='dt_discPercent', blank=True, null=True)  # Field name made lowercase.
-    dt_discdesc = models.CharField(db_column='dt_discDesc', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    dt_discdesc = models.CharField(db_column='dt_discDesc', max_length=200, blank=True, null=True)  # Field name made lowercase.
     dt_discno = models.CharField(max_length=10, blank=True, null=True)
     dt_remark = models.CharField(max_length=60, blank=True, null=True)
     dt_Staffnoid = models.ForeignKey(Employee, on_delete=models.PROTECT,  null=True)
@@ -2081,7 +2088,7 @@ class ItemHelper(models.Model):
     amount = models.FloatField(db_column='Amount', blank=True, null=True)  # Field name made lowercase.
     helper_name = models.CharField(db_column='Helper_Name', max_length=600, blank=True, null=True)  # Field name made lowercase.
     helper_code = models.CharField(db_column='Helper_Code', max_length=200, null=True)  # Field name made lowercase.
-    sa_date = models.DateTimeField( null=True,auto_now=True)
+    sa_date = models.DateTimeField( null=True)
     site_code = models.CharField(db_column='Site_code', max_length=10, null=True)  # Field name made lowercase.
     # cas_logno = models.CharField(db_column='Cas_logno', max_length=20, blank=True, null=True)  # Field name made lowercase.
     share_amt = models.FloatField(db_column='Share_Amt', blank=True, null=True)  # Field name made lowercase.
@@ -2667,7 +2674,7 @@ class Stock(models.Model):
 
     class Meta:
         db_table = 'Stock'
-        unique_together = (('item_code'),)
+        # unique_together = (('item_code'),)
 
     def __str__(self):
         return str(self.item_desc)
@@ -2940,8 +2947,8 @@ class PrepaidOpenCondition(models.Model):
     id = models.AutoField(db_column='ID',primary_key=True)  # Field name made lowercase.
     p_itemtype = models.CharField(db_column='P_ItemType', max_length=20, null=True)  # Field name made lowercase.
     item_code = models.CharField(max_length=20, null=True)
-    conditiontype1 = models.CharField(db_column='ConditionType1', max_length=20, null=True)  # Field name made lowercase.
-    conditiontype2 = models.CharField(db_column='ConditionType2', max_length=20, null=True)  # Field name made lowercase.
+    conditiontype1 = models.CharField(db_column='ConditionType1', max_length=80, null=True)  # Field name made lowercase.
+    conditiontype2 = models.CharField(db_column='ConditionType2', max_length=80, null=True)  # Field name made lowercase.
     prepaid_value = models.FloatField(db_column='Prepaid_Value', blank=True, null=True)  # Field name made lowercase.
     prepaid_sell_amt = models.FloatField(db_column='Prepaid_Sell_Amt', blank=True, null=True)  # Field name made lowercase.
     prepaid_valid_period = models.CharField(db_column='Prepaid_Valid_Period', max_length=20, null=True)  # Field name made lowercase.
@@ -2953,12 +2960,18 @@ class PrepaidOpenCondition(models.Model):
     creditvalueshared = models.BooleanField(db_column='CreditValueShared')  # Field name made lowercase.
     updated_at = models.DateTimeField(auto_now=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
+    itemcart = models.ForeignKey('custom.ItemCart', on_delete=models.PROTECT,null=True)
+    itemdept_id = models.IntegerField(db_column='itemdept_id', blank=True, null=True)  # Field name made lowercase.
+    itembrand_id = models.IntegerField(db_column='itembrand_id', blank=True, null=True)  # Field name made lowercase.
+
+
 
     class Meta:
         db_table = 'Prepaid_Open_Condition'
+        # unique_together = (('conditiontype1', 'conditiontype2'),)
 
     def __str__(self):
-        return str(self.P_ItemType)
+        return str(self.p_itemtype)
 
 class ScheduleHour(models.Model):
     id = models.AutoField(db_column='ID',primary_key=True)  # Field name made lowercase.

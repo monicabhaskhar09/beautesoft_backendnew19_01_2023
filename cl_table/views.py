@@ -26,7 +26,7 @@ from .models import (Gender, Employee, Fmspw, Attendance2, Customer, Images, Tre
                      ItemDiv,Tempcustsign,CustomerDocument,TreatmentPackage,Tmptreatment,CustLogAudit,ContactPerson,
                      ItemFlexiservice,termsandcondition,Dayendconfirmlog,Participants,ProjectDocument,
                      MGMPolicyCloud,CustomerReferral,sitelistip,DisplayCatalog,
-                     DisplayItem,OutletRequestLog)
+                     DisplayItem,OutletRequestLog,ItemBrand,PrepaidOpenCondition,PrepaidValidperiod)
 from cl_app.models import ItemSitelist, SiteGroup, LoggedInUser,TmpTreatmentSession
 from custom.models import Room,ItemCart,VoucherRecord,EmpLevel,PosPackagedeposit,payModeChangeLog,ProjectModel
 from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializer, Attendance2Serializer,
@@ -67,7 +67,9 @@ from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializ
                           Custphone2Serializer,DayendconfirmlogSerializer,CustomerPointAccountSerializer,
                           MGMPolicyCloudSerializer,CustomerReferralSerializer,SitelistipSerializer,
                           DisplayCatalogSerializer,DisplayItemSerializer,DisplayItemStockSerializer,
-                          DisplayItemlistSerializer,OutletRequestLogSerializer)
+                          DisplayItemlistSerializer,OutletRequestLogSerializer,
+                          PrepaidValidperiodSerializer,ItemCartCustomerReceiptSerializer,
+                          ItemCartdaudSerializer,ScheduleMonthSerializer)
 from datetime import date, timedelta, datetime
 import datetime
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
@@ -82,6 +84,7 @@ from django.contrib.auth import authenticate, login , logout, get_user_model
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator, InvalidPage
 import math
 from custom.views import response, get_client_ip, round_calc
+from custom.services import customer_balanceoutstanding
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import JsonResponse
@@ -135,6 +138,8 @@ import xlrd
 import calendar 
 from cl_app.serializers import StockSerializer
 from django.utils.dateparse import parse_datetime
+from xhtml2pdf import pisa
+
 type_ex = ['VT-Deposit','VT-Top Up','VT-Sales']
 
 # Create your views here .
@@ -400,12 +405,12 @@ class CustomerViewset(viewsets.ModelViewSet):
                     k = serializer.save(site_code=site_obj.itemsite_code,cust_code=cus_code,
                     cust_sexes=gender.itm_code if gender else None, cust_joindate=timezone.now(),
                     join_status=True,cust_class=classobj.class_code if classobj and classobj.class_code else None,
-                    Cust_Classid=classobj,custallowsendsms=True)
+                    Cust_Classid=classobj,custallowsendsms=True,or_key=site_obj.itemsite_code)
                 else:
                     k = serializer.save(site_code=site.itemsite_code,Site_Codeid=site,cust_code=cus_code,
                     cust_sexes=gender.itm_code if gender else None, cust_joindate=timezone.now(),
                     join_status=True,cust_class=classobj.class_code if classobj and classobj.class_code else None,
-                    Cust_Classid=classobj,custallowsendsms=True)
+                    Cust_Classid=classobj,custallowsendsms=True,or_key=site.itemsite_code)
 
                 if k.pk:
                     control_obj.control_no = int(control_obj.control_no) + 1
@@ -2777,8 +2782,8 @@ def schedulemonth_time(self, date, emp, site, start, end, type_v, appt, sc_value
     if end > "11:00" and start < "11:30":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
         site_code__in=site_ids).filter(~Q(itm_Typeid__itm_code='100007')).update(time11=sc_value)
-        if month:
-            ScheduleMonth.objects.filter(pk=month.pk).update(time11=sc_value)
+        # if month:
+        #     ScheduleMonth.objects.filter(pk=month.pk).update(time11=sc_value)
 
     if end > "11:30" and start < "12:00":
         month = ScheduleMonth.objects.filter(itm_date__date=date,Emp_Codeid__pk=emp.pk,
@@ -7725,6 +7730,8 @@ class UsersList(APIView):
             value_name='PoolSharing',isactive=True).first()
             outletrestrict_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
             value_name='Customeroutletrestrict',isactive=True).first()
+            courseautopro_setup = Systemsetup.objects.filter(title='courseautoproportion',
+            value_name='courseautoproportion',isactive=True).first()
        
        
     
@@ -7806,8 +7813,9 @@ class UsersList(APIView):
             # 'flgsales' : fmspw.flgsales if fmspw.flgsales == True else False,
             # 'flgtcm' : fmspw.flgtcm if fmspw.flgtcm == True else False,
             # 'flgpayroll' : fmspw.flgpayroll if fmspw.flgpayroll == True else False,
-            # 'flginvoices' : fmspw.flginvoices if fmspw.flginvoices == True else False ,
-            # 'flgstaff':fmspw.flgstaff if fmspw.flgstaff == True else False ,
+            'flginvoicedate' : fmspw.flginvoicedate if fmspw.flginvoicedate == True else False ,
+            'flgstaff':fmspw.flgstaff if fmspw.flgstaff == True else False ,
+            'flgpayment':fmspw.flgpayment if fmspw.flgpayment == True else False ,
             # 'flginventory' : fmspw.flginventory if fmspw.flginventory == True else False ,
             # 'flgdayend' : fmspw.flgdayend if fmspw.flgdayend == True else False ,
             # 'flgbackend' : fmspw.flgbackend if fmspw.flgbackend == True else False ,
@@ -7845,6 +7853,7 @@ class UsersList(APIView):
             'userswitch' : True if userswitch_setup and userswitch_setup.value_data == 'True' else False,  
             'poolsharing' : True if poolsharing_setup and poolsharing_setup.value_data == 'True' else False,  
             'customeroutletrestrict' : True if outletrestrict_setup and outletrestrict_setup.value_data == 'True' else False,  
+            'courseautoproportion' : True if courseautopro_setup and courseautopro_setup.value_data == 'True' else False,  
             }
 
 
@@ -8235,6 +8244,8 @@ class postaudViewset(viewsets.ModelViewSet):
 
             if cust_obj:
                 value['cust_noid'] = cust_obj.pk
+                # ex_ids = CustomerExtended.objects.filter(cust_codeid__pk=cust_obj.pk).first()
+                # value['cust_stripeid'] = ex_ids.stripe_id if ex_ids and ex_ids.stripe_id else None
                 value['cust_stripeid'] = cust_obj.stripe_id if cust_obj and cust_obj.stripe_id else None
 
 
@@ -8356,11 +8367,23 @@ class postaudViewset(viewsets.ModelViewSet):
                 depotype_ids = DepositType.objects.filter(sa_transacno=sa_transacno,
                 site_code=site.itemsite_code).delete()
 
-                  
+                for idx, reqt in enumerate(request.data, start=1): 
+                    paytable_obj = Paytable.objects.filter(pk=reqt['pay_typeid'],pay_isactive=True).first()
+                    if not paytable_obj:
+                        raise Exception('Paytable ID does not exist') 
+
+                    if float(reqt['pay_amt']) == 0: 
+                        if poshaud_v.sa_transacno_type in ['Redeem Service','Non Sales']:
+                            if paytable_obj.pay_code != 'CS':
+                                raise Exception("$0 payamt is not allowed for {0} payment mode!!!".format(str(paytable_obj.pay_description))) 
+                        elif poshaud_v.sa_transacno_type in ['Receipt']:
+                            raise Exception("$0 payamt is not allowed for {0} payment mode!!!".format(str(paytable_obj.pay_description))) 
+
+
                 for idx, req in enumerate(request.data, start=1): 
                     paytable = Paytable.objects.filter(pk=req['pay_typeid'],pay_isactive=True).first()
-                    if not paytable:
-                        raise Exception('Paytable ID does not exist') 
+                    # if not paytable:
+                    #     raise Exception('Paytable ID does not exist') 
                         
                         
                     pay_amt += float(req['pay_amt'])
@@ -8449,10 +8472,11 @@ class postaudViewset(viewsets.ModelViewSet):
                                 if taud:
                                     taud_ids.append(taud.pk)
                         
+                        # taudid=taud,
                         payModeChangeLog(sa_transacno=sa_transacno,paytype=req['old_paytype'] if 'old_paytype' in req else None,
                         payamt="{:.2f}".format(float(req['old_payamt'])) if 'old_payamt' in req else None,newpaytype=paytable.pay_code,
                         newpayamt="{:.2f}".format(float(req['pay_amt'])),
-                        taudid=taud,dt_lineno=idx,itemsite_code=site.itemsite_code).save()
+                        dt_lineno=idx,itemsite_code=site.itemsite_code).save()
 
                 if taud_ids !=[]:
                     state = status.HTTP_201_CREATED
@@ -8477,7 +8501,6 @@ class postaudViewset(viewsets.ModelViewSet):
     def create(self, request):
         try:
             with transaction.atomic():
-
                 cart_date = timezone.now().date()
                 global type_ex
                 request = self.request
@@ -8638,21 +8661,111 @@ class postaudViewset(viewsets.ModelViewSet):
                             result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Treatment done service staffs not mapped!!",'error': True} 
                             return Response(result, status=status.HTTP_400_BAD_REQUEST) 
 
-                checkgt=[]
+                for m in depotop_ids:
+                    if not m.multistaff_ids.all():
+                        line_nomsg = "Cart line no {0} is not have Sales Staff.".format(str(m.lineno))
+                        result = {'status': status.HTTP_400_BAD_REQUEST,
+                        "message":line_nomsg,'error': True} 
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+
+
+
+                
                 # print(request.data,"request.data")
-                for rgt in request.data:
-                    paytablegt = Paytable.objects.filter(pk=rgt['pay_typeid'],pay_isactive=True).first()
-                    if not paytablegt:
-                        msg = "Paytable ID does not exist"
+                # for rgt in request.data:
+                #     paytablegt = Paytable.objects.filter(pk=rgt['pay_typeid'],pay_isactive=True).first()
+                #     if not paytablegt:
+                #         msg = "Paytable ID does not exist"
+                #         result = {'status': status.HTTP_400_BAD_REQUEST,"message":msg,'error': True} 
+                #         return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+
+                #     stringgt = paytablegt.gt_group
+                #     st_newgt= "".join(stringgt.split())
+                #     if st_newgt == 'GT1': 
+                #         checkgt.append("GT1") 
+                #     if st_newgt == 'GT2': 
+                #         checkgt.append("GT2") 
+
+                pay_amt = 0.0  ; taud_ids = []; check=[] ; checkgt=[]
+                # satransacno = request.GET.get('satransacno',None)
+                for r in request.data:
+                    # print(r['pay_typeid'],"r['pay_typeid']")
+                    paytable = Paytable.objects.filter(pk=r['pay_typeid'],pay_isactive=True).first()
+                    # pay_ids = Paytable.objects.filter(pk=r['pay_typeid'],pay_isactive=True)
+                    if not paytable:
+                        msg = "Paytable ID %s is does not exist!!".format(r['pay_typeid'])
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":msg,'error': True} 
                         return Response(result, status=status.HTTP_400_BAD_REQUEST) 
 
-                    stringgt = paytablegt.gt_group
+                    stringgt = paytable.gt_group
                     st_newgt= "".join(stringgt.split())
                     if st_newgt == 'GT1': 
                         checkgt.append("GT1") 
                     if st_newgt == 'GT2': 
-                        checkgt.append("GT2") 
+                        checkgt.append("GT2")     
+
+                    if r['prepaid'] == True:
+                        spltn = str(r['pay_rem1']).split("-")
+                        ppno = spltn[0]
+                        lineno = spltn[1]
+                    
+                        pacids = PrepaidAccount.objects.filter(pp_no=ppno,line_no=lineno,
+                        cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
+                        if pacids and pacids.remain:
+                            #if float(r['pay_amt']) > float(pac_ids.remain):
+                            if float(r['pay_amt']) > float(pacids.remain):
+                                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
+                                return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+                    # elif 'points' in r and r['points'] == True: 
+                    #     if not 'cur_value' in r or not r['cur_value'] or float(r['cur_value']) <= 0:
+                    #         raise Exception("Valid Points Currency Value not given!!")
+
+
+                    pay_amt += float(r['pay_amt'])
+                    string = paytable.pay_groupid.pay_group_code
+                    st_new= "".join(string.split())
+                    if st_new == 'CASH':
+                        if "CASH" not in check:
+                            check.append("CASH")
+                        else:    
+                            if "CASH" in check: 
+                                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Double Cash Pay Not Allowed!!",'error': True} 
+                                return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+                    if st_new == 'CARD': 
+                        check.append("CARD") 
+                    if str(st_new) == 'Credit': 
+                        check.append("CREDIT")
+                    if str(st_new) == 'Credit Note': 
+                        check.append("CREDIT")
+                    if str(st_new) == 'CreditNote': 
+                        check.append("CREDIT")
+                    if str(st_new) == 'PREPAID':
+                        check.append("PREPAID")
+                    if str(st_new) == 'OLD BILL':
+                        check.append("OLD BILL")
+                    if str(st_new) == 'E-WALLET':
+                        check.append("E-WALLET")
+                    if str(st_new) == 'VOUCHER':
+                        check.append("VOUCHER")
+                    if str(st_new) == 'Point':
+                        check.append("Point") 
+
+
+                # print(check,"check")
+                id_itm = dict(Counter(check))
+                # print(id_itm,"id_itm")
+
+                # print(len(request.data),"Length")
+                # print(pay_amt,value['billable_amount']) 
+                tcheck = list(set(check)) 
+                #prepaid will not add gst 7%
+
+                # if pay_amt < float(value['billable_amount']) or pay_amt > float(value['billable_amount']):
+                #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Pay amount should be equal to billable amount!!",'error': True} 
+                #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+        
                 
                 refcontrol_obj = ControlNo.objects.none()
                 if depotop_ids:
@@ -8773,79 +8886,7 @@ class postaudViewset(viewsets.ModelViewSet):
                         raise Exception("PosDaud Already Created!!")
                       
                 
-                pay_amt = 0.0  ; taud_ids = []; check=[]
-                # satransacno = request.GET.get('satransacno',None)
-                for r in request.data:
-                    # print(r['pay_typeid'],"r['pay_typeid']")
-                    paytable = Paytable.objects.filter(pk=r['pay_typeid'],pay_isactive=True).first()
-                    pay_ids = Paytable.objects.filter(pk=r['pay_typeid'],pay_isactive=True)
-                    # if not pay_ids:
-                    #     msg = "Paytable ID %s is does not exist!!".format(r['pay_typeid'])
-                    #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":msg,'error': True} 
-                    #     return Response(result, status=status.HTTP_400_BAD_REQUEST) 
-
-                    if r['prepaid'] == True:
-                        spltn = str(r['pay_rem1']).split("-")
-                        ppno = spltn[0]
-                        lineno = spltn[1]
-                    
-                        pacids = PrepaidAccount.objects.filter(pp_no=ppno,line_no=lineno,
-                        cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
-                        if pacids and pacids.remain:
-                            #if float(r['pay_amt']) > float(pac_ids.remain):
-                            if float(r['pay_amt']) > float(pacids.remain):
-                                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
-                                return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
-
-                    # elif 'points' in r and r['points'] == True: 
-                    #     if not 'cur_value' in r or not r['cur_value'] or float(r['cur_value']) <= 0:
-                    #         raise Exception("Valid Points Currency Value not given!!")
-
-
-                    pay_amt += float(r['pay_amt'])
-                    string = paytable.pay_groupid.pay_group_code
-                    st_new= "".join(string.split())
-                    if st_new == 'CASH':
-                        if "CASH" not in check:
-                            check.append("CASH")
-                        else:    
-                            if "CASH" in check: 
-                                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Double Cash Pay Not Allowed!!",'error': True} 
-                                return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
-
-                    if st_new == 'CARD': 
-                        check.append("CARD") 
-                    if str(st_new) == 'Credit': 
-                        check.append("CREDIT")
-                    if str(st_new) == 'Credit Note': 
-                        check.append("CREDIT")
-                    if str(st_new) == 'CreditNote': 
-                        check.append("CREDIT")
-                    if str(st_new) == 'PREPAID':
-                        check.append("PREPAID")
-                    if str(st_new) == 'OLD BILL':
-                        check.append("OLD BILL")
-                    if str(st_new) == 'E-WALLET':
-                        check.append("E-WALLET")
-                    if str(st_new) == 'VOUCHER':
-                        check.append("VOUCHER")
-                    if str(st_new) == 'Point':
-                        check.append("Point") 
-
-
-                # print(check,"check")
-                id_itm = dict(Counter(check))
-                # print(id_itm,"id_itm")
-
-                # print(len(request.data),"Length")
-                # print(pay_amt,value['billable_amount']) 
-                tcheck = list(set(check)) 
-                #prepaid will not add gst 7%
-
-                # if pay_amt < float(value['billable_amount']) or pay_amt > float(value['billable_amount']):
-                #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Pay amount should be equal to billable amount!!",'error': True} 
-                #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
-
+                
                 add = 0.0
                 # value['tax_amt'] = 0
                 transremark = None
@@ -8877,9 +8918,10 @@ class postaudViewset(viewsets.ModelViewSet):
                 else:
                     if cust_obj and cust_obj.cust_point_value and cust_obj.cust_point_value > 0:
                         custnow_point = cust_obj.cust_point_value
-
+                
+                prepaid_redeemlst = []
                 for idx, req in enumerate(request.data, start=1): 
-                    # print(idx,"idx")
+                    # print(req,"idx")
                     paytable = Paytable.objects.filter(pk=req['pay_typeid'],pay_isactive=True).first()
                     # pay_ids = Paytable.objects.filter(pk=req['pay_typeid'],pay_isactive=True)
                     # if not pay_ids:
@@ -8950,69 +8992,250 @@ class postaudViewset(viewsets.ModelViewSet):
                                 splt = str(req['pay_rem1']).split("-")
                                 pp_no = splt[0]
                                 line_no = splt[1]
+                                # print(pp_no,line_no,"line_no")
                                 open_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
-                                pos_daud_lineno=line_no).only('pp_no','pos_daud_lineno').first()
+                                pos_daud_lineno=line_no,p_itemtype="Inclusive").only('pp_no','pos_daud_lineno').first()
+                               
                                 pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
                                 cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
-                                if pac_ids and open_ids:
+                                
+                                #OP redeem_amount calculations
+                                ol_open_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                pos_daud_lineno=line_no).order_by('pk')
+
+                                if pac_ids and ol_open_ids:
+                                    whole_ids = depo_ids.filter(itemcodeid__item_div__in=[3,1,4]).filter(~Q(itemcodeid__item_type='PACKAGE'))
+                                    service_ids = depo_ids.filter(itemcodeid__item_div=3).filter(~Q(itemcodeid__item_type='PACKAGE'))
+                                    product_ids = depo_ids.filter(itemcodeid__item_div=1).filter(~Q(itemcodeid__item_type='PACKAGE'))
+            
                                     # if float(req['pay_amt']) > float(pac_ids.remain):
                                     #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
                                     #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                                     
-                                    conditiontype1 = str(open_ids.conditiontype1.lower()).split(',') 
-                                    conditiontype_res = [ele.replace(" ", "") for ele in conditiontype1]
-
-                                   
-                                    all_ids = False
-                                    if "all" in conditiontype_res:
-                                        all_ids = depo_ids.filter(itemcodeid__item_div__in=[3,1,4])
-                                       
-                                    elif "serviceonly" in conditiontype_res: 
-                                        all_ids = depo_ids.filter(itemcodeid__item_div=3)
-                                        
-                                    elif "productonly" in conditiontype_res: 
-                                        all_ids = depo_ids.filter(itemcodeid__item_div=1)
-                                        
-                                    check_amt = float(req['pay_amt'])
-                                    if all_ids:
-                                        for i in all_ids:
-                                            if check_amt > 0:
-                                                checkamt = check_amt
-                                                p_pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
-                                                cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
-                                                
-                                                PrepaidAccount.objects.filter(pk=p_pac_ids.pk).update(status=False)
-                                                
-                                                check_amt -= i.deposit 
-                                                if check_amt > 0:
-                                                    use_amt = i.deposit
-                                                    remain = float(p_pac_ids.remain) - float(i.deposit)
-                                                else:
-                                                    use_amt = checkamt
-                                                    remain = float(p_pac_ids.remain) - float(use_amt)
-
-                                                vstatus = True
-                                                if remain == 0 and p_pac_ids.outstanding == 0:
-                                                    vstatus = False
-        
-                                                prepacc = PrepaidAccount(pp_no=pac_ids.pp_no,pp_type=pac_ids.pp_type,
-                                                pp_desc=pac_ids.pp_desc,exp_date=pac_ids.exp_date,cust_code=pac_ids.cust_code,
-                                                cust_name=pac_ids.cust_name,pp_amt=pac_ids.pp_amt,pp_total=pac_ids.pp_total,
-                                                pp_bonus=pac_ids.pp_bonus,transac_no=sa_transacno,item_no=i.itemcodeid.item_code,use_amt=use_amt,
-                                                remain=remain,ref1=pac_ids.ref1,ref2=pac_ids.ref2,status=vstatus,site_code=site.itemsite_code,sa_status="SA",exp_status=pac_ids.exp_status,
-                                                voucher_no=pac_ids.voucher_no,isvoucher=pac_ids.isvoucher,has_deposit=pac_ids.has_deposit,topup_amt=0,
-                                                outstanding=pac_ids.outstanding if pac_ids and pac_ids.outstanding is not None and pac_ids.outstanding > 0 else 0,active_deposit_bonus=pac_ids.active_deposit_bonus,topup_no="",topup_date=None,
-                                                line_no=pac_ids.line_no,staff_name=None,staff_no=None,
-                                                pp_type2=open_ids.conditiontype2,condition_type1=open_ids.conditiontype1,pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
-                                                Item_Codeid=i.itemcodeid,item_code=i.itemcodeid.item_code)
-                                                prepacc.save()
-                                                prepacc.sa_date = pay_date 
-                                                prepacc.start_date = pay_date
-                                                prepacc.save()
-                                                
-                                        acc = PrepaidAccountCondition.objects.filter(pk=open_ids.pk).update(use_amt=float(req['pay_amt']),
-                                        remain=remain)
                                     
+                                    cartid_lst = []
+                                    inc_ids = ol_open_ids.filter(p_itemtype="Inclusive")
+                                    if inc_ids:
+                                        for o in inc_ids:
+                                            conditiontype1 = str(o.conditiontype1.lower()).split(',') 
+                                            # print(conditiontype1,"conditiontype1")
+                                            conditiontype1_res = [ele.replace(" ", "") for ele in conditiontype1]
+                                            # print(conditiontype_res,"conditiontype_res")
+
+                                            conditiontype2 = str(o.conditiontype2.lower()).split(',') 
+                                            # print(conditiontype2,"conditiontype2")
+                                            conditiontype2_res = [el.replace(" ", "") for el in conditiontype2]
+                                            # print(conditiontype2_res,"conditiontype2_res")
+                                            # if o.p_itemtype == "Inclusive":
+                                            item_brand = list(set(ItemBrand.objects.filter(pk=o.itembrand_id,
+                                            retail_product_brand=True,itm_status=True).values_list('itm_code', flat=True).distinct()))
+                                            
+                                            if "all" in conditiontype1_res:
+                                                if "all" in conditiontype2_res:
+                                                    allfilter_ids = list(set(whole_ids.values_list('pk', flat=True).distinct()))
+                                                    cartid_lst += allfilter_ids
+                                                else:
+                                                    alser_filter_ids = list(set(service_ids.filter(itemcodeid__Item_Deptid__pk=o.itemdept_id).values_list('pk', flat=True).distinct()))
+                                                    if alser_filter_ids:
+                                                        cartid_lst += alser_filter_ids
+
+                                                    if item_brand:
+                                                        alpro_filter_ids = list(set(product_ids.filter(itemcodeid__item_brand__in=item_brand).values_list('pk', flat=True).distinct())) 
+                                                        if alpro_filter_ids:
+                                                            cartid_lst +=  alpro_filter_ids      
+                                                    
+                                            elif "serviceonly" in conditiontype1_res: 
+                                                if "all" in conditiontype2_res:
+                                                    ser_filter_ids = list(set(service_ids.values_list('pk', flat=True).distinct()))
+                                                    cartid_lst += ser_filter_ids
+                                                else:
+                                                    eser_filter_ids = list(set(service_ids.filter(itemcodeid__Item_Deptid__pk=o.itemdept_id).values_list('pk', flat=True).distinct()))
+                                                    cartid_lst += eser_filter_ids
+                                            elif "productonly" in conditiontype1_res:
+                                                if "all" in conditiontype2_res:
+                                                    pro_filter_ids = list(set(product_ids.values_list('pk', flat=True).distinct()))
+                                                    cartid_lst += pro_filter_ids
+                                                else:
+                                                    if item_brand:
+                                                        epro_filter_ids = list(set(product_ids.filter(itemcodeid__item_brand__in=item_brand).values_list('pk', flat=True).distinct())) 
+                                                        cartid_lst +=  epro_filter_ids  
+
+                                    exc_ids = ol_open_ids.filter(p_itemtype="Exclusive")
+                                    inc_cart_ids = ItemCart.objects.filter(pk__in=list(set(cartid_lst))).order_by('id')
+                                    # print(inc_cart_ids,"inc_cart_ids")
+                                    if inc_cart_ids:
+                                        use_final_ids = inc_cart_ids
+                                        if exc_ids:
+                                            for exc in exc_ids:
+                                                itembrand_p = list(set(ItemBrand.objects.filter(pk=exc.itembrand_id,
+                                                retail_product_brand=True,itm_status=True).values_list('itm_code', flat=True).distinct()))
+                                                
+                                                exconditiontype1 = str(exc.conditiontype1.lower()).split(',') 
+                                                # print(conditiontype1,"conditiontype1")
+                                                exconditiontype1_res = [elex.replace(" ", "") for elex in exconditiontype1]
+                                                # print(conditiontype_res,"conditiontype_res")
+
+                                                exconditiontype2 = str(exc.conditiontype2.lower()).split(',') 
+                                                # print(conditiontype2,"conditiontype2")
+                                                exconditiontype2_res = [elx.replace(" ", "") for elx in exconditiontype2]
+                                                # print(conditiontype2_res,"conditiontype2_res")
+                                                if "serviceonly" in exconditiontype1_res: 
+                                                    final_ids = use_final_ids.filter(~Q(itemcodeid__Item_Deptid__pk=exc.itemdept_id))
+                                                    use_final_ids = final_ids
+                                                elif "productonly" in exconditiontype1_res: 
+                                                    if itembrand_p:
+                                                        final_ids = use_final_ids.filter(~Q(itemcodeid__item_brand__in=itembrand_p))
+                                                        use_final_ids = final_ids
+                                        
+                                        # print(use_final_ids,"use_final_ids")
+
+                                        
+                                        used_amount = 0    
+                                        check_amt = float(req['pay_amt'])
+                                        # if prepaid_redeemlst != []:
+                                        #     use_final_ids = use_final_ids.filter(~Q(pk__in=prepaid_redeemlst))
+                                        # print(use_final_ids,"use_final_ids 111")
+                                        if use_final_ids:
+                                            for i in use_final_ids:
+                                                # print(i,"ii")
+                                                # redeem_allow = False
+                                                if check_amt > 0:
+                                                    checkamt = check_amt
+                                                    # print(checkamt,"checkamt 111")
+                                                    
+                                                    if i.pk in req['cartuse_ids']:
+                                                        p_pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
+                                                        cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
+                                                        
+                                                        PrepaidAccount.objects.filter(pk=p_pac_ids.pk).update(status=False)
+                                                        
+                                                        check_amt -= i.deposit 
+                                                        # print(check_amt,"check_amt")
+                                                        if check_amt > 0:
+                                                            use_amt = i.deposit
+                                                            remain = float(p_pac_ids.remain) - float(i.deposit)
+                                                        else:
+                                                            use_amt = checkamt
+                                                            
+                                                            remain = float(p_pac_ids.remain) - float(use_amt)
+                                                        # print(use_amt,"use_amt")    
+                                                        used_amount += use_amt
+                                                        vstatus = True
+                                                        if remain == 0 and p_pac_ids.outstanding == 0:
+                                                            vstatus = False
+                
+                                                        prepacc = PrepaidAccount(pp_no=pac_ids.pp_no,pp_type=pac_ids.pp_type,
+                                                        pp_desc=pac_ids.pp_desc,exp_date=pac_ids.exp_date,cust_code=pac_ids.cust_code,
+                                                        cust_name=pac_ids.cust_name,pp_amt=pac_ids.pp_amt,pp_total=pac_ids.pp_total,
+                                                        pp_bonus=pac_ids.pp_bonus,transac_no=sa_transacno,item_no=i.itemcodeid.item_code,use_amt=use_amt,
+                                                        remain=remain,ref1=pac_ids.ref1,ref2=pac_ids.ref2,status=vstatus,site_code=site.itemsite_code,sa_status="SA",exp_status=pac_ids.exp_status,
+                                                        voucher_no=pac_ids.voucher_no,isvoucher=pac_ids.isvoucher,has_deposit=pac_ids.has_deposit,topup_amt=0,
+                                                        outstanding=pac_ids.outstanding if pac_ids and pac_ids.outstanding is not None and pac_ids.outstanding > 0 else 0,active_deposit_bonus=pac_ids.active_deposit_bonus,topup_no="",topup_date=None,
+                                                        line_no=pac_ids.line_no,staff_name=None,staff_no=None,
+                                                        pp_type2=open_ids.conditiontype2,condition_type1=open_ids.conditiontype1,pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
+                                                        Item_Codeid=p_pac_ids.Item_Codeid,item_code=p_pac_ids.item_code)
+                                                        prepacc.save()
+                                                        prepacc.sa_date = pay_date 
+                                                        prepacc.start_date = pay_date
+                                                        prepacc.save()
+                                                        # prepaid_redeemlst.append(i.pk) 
+
+                                                        redeem_ppac = False; op_conditionobj = False
+
+                                                        if int(i.itemcodeid.Item_Divid.itm_code) == 3:
+                                                            updopen_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                            pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="Service Only",
+                                                            itemdept_id=i.itemcodeid.Item_Deptid.pk).first()
+                                                            if updopen_ids:
+                                                                redeem_ppac = True ; op_conditionobj = updopen_ids
+                                                            else:
+                                                                updopenall_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                                pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="Service Only",
+                                                                conditiontype2="All").first()
+                                                                if updopenall_ids:
+                                                                    redeem_ppac = True; op_conditionobj=updopenall_ids
+
+                                                            if redeem_ppac == False:
+                                                                upda_dpall_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                                pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="All",
+                                                                itemdept_id=i.itemcodeid.Item_Deptid.pk).first()
+                                                                if upda_dpall_ids:
+                                                                    redeem_ppac = True; op_conditionobj = upda_dpall_ids
+                                                                
+                                                                    
+                                                        elif int(i.itemcodeid.Item_Divid.itm_code) == 1:
+                                                            item_brand_code = ItemBrand.objects.filter(itm_code=i.itemcodeid.item_brand,
+                                                            retail_product_brand=True,itm_status=True).first()
+                                                            if item_brand_code:
+                                                                updpro_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                                pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="Product Only",
+                                                                itembrand_id=item_brand_code.pk).first()
+                                                                if updpro_ids:
+                                                                    redeem_ppac = True; op_conditionobj=updpro_ids
+                                                                else:
+                                                                    updproall_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                                    pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="Product Only",
+                                                                    conditiontype2="All").first()
+                                                                    if updproall_ids:
+                                                                        redeem_ppac = True; op_conditionobj = updproall_ids
+
+                                                                if redeem_ppac == False:
+                                                                    upda_brall_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                                    pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="All",
+                                                                    itembrand_id=item_brand_code.pk).first()
+                                                                    if upda_brall_ids:
+                                                                        redeem_ppac = True; op_conditionobj = upda_brall_ids
+                                                                        
+                                                        # print(redeem_ppac,"redeem_ppac")
+                                                        if redeem_ppac == False:
+                                                            upda_all_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                            pos_daud_lineno=line_no,p_itemtype="Inclusive",conditiontype1="All",
+                                                            conditiontype2="All").first()
+                                                            # print(upda_all_ids,"upda_all_ids")
+                                                            if upda_all_ids:
+                                                                redeem_ppac = True; op_conditionobj = upda_all_ids
+
+                                                        if op_conditionobj:
+                                                            PrepaidAccount.objects.filter(pk=prepacc.pk).update(pp_type2=op_conditionobj.conditiontype2,
+                                                            condition_type1=op_conditionobj.conditiontype1)
+                                                            op_cond_remain = float(op_conditionobj.remain) - float(prepacc.use_amt)
+                                                            op_cond_useamount = float(op_conditionobj.use_amt) + float(prepacc.use_amt)
+                                                           
+                                                            upd_preacc = PrepaidAccountCondition.objects.filter(pk=op_conditionobj.pk).update(remain=op_cond_remain,
+                                                            use_amt=op_cond_useamount)
+
+
+                           
+
+                                            # print(used_amount,"used_amount") 
+                                            # print(redeem_allow,"redeem_allow")
+                                            # print(prepaid_redeemlst,"prepaid_redeemlst")  
+                                            # if used_amount > 0:
+                                            #     if used_amount < float(req['pay_amt']):
+                                            #         msg = "Prepaid {0},line no {1},pp_no {2} pay amount is greater than use amount !".format(str(pac_ids.pp_desc),
+                                            #         str(pac_ids.line_no),str(pac_ids.pp_no))
+                                            #         result = {'status': status.HTTP_400_BAD_REQUEST,
+                                            #         "message":msg,'error': True} 
+                                            #         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+                                                # float(req['pay_amt']) 
+                                                # p_itemtype="Inclusive"
+                                                # ac_open_ids = list(set(PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                                # pos_daud_lineno=line_no).only('pp_no','pos_daud_lineno').values_list('id', flat=True).distinct()))
+                                                # if ac_open_ids != []:    
+                                                #     acc = PrepaidAccountCondition.objects.filter(pk__in=ac_open_ids).update(use_amt=used_amount,
+                                                #     remain=remain)
+
+                                        # else:
+                                        #     prmsg = "Prepaid {0},line no {1},pp_no {2} does't not have redeem item to use based on conditiontypes 1 & 2 !".format(str(pac_ids.pp_desc),
+                                        #     str(pac_ids.line_no),str(pac_ids.pp_no))
+                                        #     result = {'status': status.HTTP_400_BAD_REQUEST,
+                                        #     "message":prmsg,'error': True} 
+                                        #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
                                 check.remove("PREPAID")
                             # elif req['pay_typeid'] == 17:
                             elif payByCredit:
@@ -9038,7 +9261,7 @@ class postaudViewset(viewsets.ModelViewSet):
 
                                 check.remove("CREDIT")
                             # elif req['pay_typeid'] == 9:
-                            elif str(paytable.pay_code).upper() == 'VC':    
+                            elif str(paytable.pay_code).upper() == 'VCPM':    
                                 card_no = req['pay_rem1']
                                 # crdobj = CreditNote.objects.filter(credit_code=req['pay_rem1'],cust_code=cust_obj.cust_code,site_code=site.itemsite_code).first()
                                 # crdobj = CreditNote.objects.filter(credit_code=req['pay_rem1'],cust_code=cust_obj.cust_code).first()
@@ -9073,14 +9296,18 @@ class postaudViewset(viewsets.ModelViewSet):
 
                                 check.remove("CASH")
                             elif 'points' in req and req['points'] == True:
+                                cust_class = cust_obj.cust_class
+                                cust_redeem_ids = RedeemPolicy.objects.filter(cust_type=cust_class,isactive=True).order_by('pk').first()
                                 now_point = custnow_point
-                                if now_point > 0:        
-                                    now_point -= req['pay_amt']        
-                        
+                                if now_point > 0 and cust_redeem_ids:        
+                                    
+                                    cal_point =  (req['pay_amt'] / cust_redeem_ids.cur_value) * cust_redeem_ids.point_value     
+                                    now_point -= cal_point 
+
                                     rct = CustomerPointDtl(type="Redeem",cust_code=cust_obj.cust_code,
                                     cust_name=cust_obj.cust_name,parent_code=None,parent_desc=None,
                                     parent_display=None,itm_code=paytable.pay_code,itm_desc=paytable.pay_description,
-                                    point=req['pay_amt'],now_point=now_point,remark=None,remark_code=None,
+                                    point=-cal_point,now_point=now_point,remark=None,remark_code=None,
                                     remark_desc=None,isvoid=False,void_referenceno=None,isopen=True,qty=1,
                                     seq=False,sa_status="SA",bal_acc2=req['cur_value'],point_acc1=None,
                                     point_acc2=None,locid=False)
@@ -9113,48 +9340,48 @@ class postaudViewset(viewsets.ModelViewSet):
                                 if "E-WALLET" in check: 
                                     amount = float(req['pay_amt']) - pay_gst
                                     check.remove("E-WALLET")
-                                if "PREPAID" in check: 
-                                    # print(req['prepaid'],"SHOULD NOT")
-                                    amount = float(req['pay_amt'])
-                                    # card_no = req['pay_rem1']
-                                    if req['prepaid'] == True:
-                                        splt = str(req['pay_rem1']).split("-")
-                                        pp_no = splt[0]
-                                        line_no = splt[1]
-                                        open_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
-                                        pos_daud_lineno=line_no).only('pp_no','pos_daud_lineno').first()
-                                        pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
-                                        cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
-                                        if pac_ids and open_ids:
-                                            # if float(req['pay_amt']) > float(pac_ids.remain):
-                                            #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
-                                            #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+                                # if "PREPAID" in check: 
+                                #     # print(req['prepaid'],"SHOULD NOT")
+                                #     amount = float(req['pay_amt'])
+                                #     # card_no = req['pay_rem1']
+                                #     if req['prepaid'] == True:
+                                #         splt = str(req['pay_rem1']).split("-")
+                                #         pp_no = splt[0]
+                                #         line_no = splt[1]
+                                #         open_ids = PrepaidAccountCondition.objects.filter(pp_no=pp_no,
+                                #         pos_daud_lineno=line_no,p_itemtype="Inclusive").only('pp_no','pos_daud_lineno').first()
+                                #         pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
+                                #         cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
+                                #         if pac_ids and open_ids:
+                                #             # if float(req['pay_amt']) > float(pac_ids.remain):
+                                #             #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
+                                #             #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                 
-                                            remain = float(pac_ids.remain) - float(req['pay_amt'])
-                                            PrepaidAccount.objects.filter(pk=pac_ids.pk).update(status=False)
-                                            acc = PrepaidAccountCondition.objects.filter(pk=open_ids.pk).update(use_amt=float(req['pay_amt']),
-                                            remain=remain)
-                                            # print(pac_ids.Item_Codeid,"pac_ids")
-                                            # print(remain,"remain")
-                                            vstatus = True
-                                            if remain == 0 and pac_ids.outstanding == 0:
-                                                vstatus = False
-                                            prepacc = PrepaidAccount(pp_no=pac_ids.pp_no,pp_type=pac_ids.pp_type,
-                                            pp_desc=pac_ids.pp_desc,exp_date=pac_ids.exp_date,cust_code=pac_ids.cust_code,
-                                            cust_name=pac_ids.cust_name,pp_amt=pac_ids.pp_amt,pp_total=pac_ids.pp_total,
-                                            pp_bonus=pac_ids.pp_bonus,transac_no=sa_transacno,item_no="",use_amt=float(req['pay_amt']),
-                                            remain=remain,ref1=pac_ids.ref1,ref2=pac_ids.ref2,status=vstatus,site_code=site.itemsite_code,sa_status="SA",exp_status=pac_ids.exp_status,
-                                            voucher_no=pac_ids.voucher_no,isvoucher=pac_ids.isvoucher,has_deposit=pac_ids.has_deposit,topup_amt=0,
-                                            outstanding=pac_ids.outstanding if pac_ids and pac_ids.outstanding is not None and pac_ids.outstanding > 0 else 0,active_deposit_bonus=pac_ids.active_deposit_bonus,topup_no="",topup_date=None,
-                                            line_no=pac_ids.line_no,staff_name=None,staff_no=None,
-                                            pp_type2=open_ids.conditiontype2,condition_type1=open_ids.conditiontype1,pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
-                                            Item_Codeid=pac_ids.Item_Codeid,item_code=pac_ids.item_code)
-                                            prepacc.save()
-                                            prepacc.sa_date = pay_date 
-                                            prepacc.start_date = pay_date
-                                            prepacc.save()
+                                #             remain = float(pac_ids.remain) - float(req['pay_amt'])
+                                #             PrepaidAccount.objects.filter(pk=pac_ids.pk).update(status=False)
+                                #             acc = PrepaidAccountCondition.objects.filter(pk=open_ids.pk).update(use_amt=float(req['pay_amt']),
+                                #             remain=remain)
+                                #             # print(pac_ids.Item_Codeid,"pac_ids")
+                                #             # print(remain,"remain")
+                                #             vstatus = True
+                                #             if remain == 0 and pac_ids.outstanding == 0:
+                                #                 vstatus = False
+                                #             prepacc = PrepaidAccount(pp_no=pac_ids.pp_no,pp_type=pac_ids.pp_type,
+                                #             pp_desc=pac_ids.pp_desc,exp_date=pac_ids.exp_date,cust_code=pac_ids.cust_code,
+                                #             cust_name=pac_ids.cust_name,pp_amt=pac_ids.pp_amt,pp_total=pac_ids.pp_total,
+                                #             pp_bonus=pac_ids.pp_bonus,transac_no=sa_transacno,item_no="",use_amt=float(req['pay_amt']),
+                                #             remain=remain,ref1=pac_ids.ref1,ref2=pac_ids.ref2,status=vstatus,site_code=site.itemsite_code,sa_status="SA",exp_status=pac_ids.exp_status,
+                                #             voucher_no=pac_ids.voucher_no,isvoucher=pac_ids.isvoucher,has_deposit=pac_ids.has_deposit,topup_amt=0,
+                                #             outstanding=pac_ids.outstanding if pac_ids and pac_ids.outstanding is not None and pac_ids.outstanding > 0 else 0,active_deposit_bonus=pac_ids.active_deposit_bonus,topup_no="",topup_date=None,
+                                #             line_no=pac_ids.line_no,staff_name=None,staff_no=None,
+                                #             pp_type2=open_ids.conditiontype2,condition_type1=open_ids.conditiontype1,pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
+                                #             Item_Codeid=pac_ids.Item_Codeid,item_code=pac_ids.item_code)
+                                #             prepacc.save()
+                                #             prepacc.sa_date = pay_date 
+                                #             prepacc.start_date = pay_date
+                                #             prepacc.save()
 
-                                        check.remove("PREPAID")
+                                #         check.remove("PREPAID")
 
                                 # if "CREDIT" in check: 
                                 #     amount = float(req['pay_amt'])
@@ -9267,12 +9494,22 @@ class postaudViewset(viewsets.ModelViewSet):
                                 if taud:
                                     taud_ids.append(taud.pk)
                 
+                # print(taud_ids,"taud_ids")
+                # taud_prepaid_ids = PosTaud.objects.filter(sa_transacno=sa_transacno,itemsite_code=site.itemsite_code,
+                # pay_type="PP")
+                # if taud_prepaid_ids:
+                #     if prepaid_redeemlst == []:
+                #         result = {'status': status.HTTP_400_BAD_REQUEST,
+                #         "message":"Pay Mode Prepaid Selected but no prepaid redeem SA usage records created in Prepaid Account!!",'error': True} 
+                #         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+
                 if rcdtl_lst != []:
                     # print("True")
                     redeempy_ids = CustomerPointDtl.objects.filter(pk__in=rcdtl_lst)
 
                     total_redempts = sum([i.point for i in redeempy_ids])
-                    custpoint_value = custnow_point - total_redempts
+                    custpoint_value = custnow_point - abs(total_redempts)
                     cust_obj.cust_point_value = custpoint_value
                     cust_obj.save()
 
@@ -9285,7 +9522,7 @@ class postaudViewset(viewsets.ModelViewSet):
                     time=pay_time,cust_name=cust_obj.cust_name,cust_code=cust_obj.cust_code,type="Redeem",
                     refno=sa_transacno,ref_source="Sales",isvoid=False,sa_status="SA",void_referenceno=None,
                     total_point=total_redempts,now_point=custpoint_value,seq=None,remarks=None,
-                    bal_point=custpoint_value,expired=False,expired_date=None,mac_code=False,logno=False,
+                    bal_point=custnow_point,expired=False,expired_date=None,mac_code=False,logno=False,
                     approval_user=fmspw.pw_userlogin,cardno=False,bdate=None,pdate=None,expired_point=0,
                     postransactionno=sa_transacno,postotalamt="{:.2f}".format(float(value['deposit_amt'])),locid=False,mgm_refno=None,tdate=None).save()
                     for cds in rcdtl_lst:
@@ -9328,7 +9565,7 @@ class postaudViewset(viewsets.ModelViewSet):
                     for ex in exproduct:
                         if ex not in id_lst:
                             id_lst.append(ex) 
-                
+
                 # if cart_ids.filter(type='Deposit').order_by('lineno').first():
                 #     alsales_staff = cart_ids.filter(type='Deposit').order_by('lineno').first().sales_staff.all().first()
                 # else:
@@ -9445,7 +9682,6 @@ class postaudViewset(viewsets.ModelViewSet):
                             # control_obj.control_no = int(control_obj.control_no) + 1
                             # control_obj.save()
                 
-
                 nopointsfordiscount_setup = Systemsetup.objects.filter(title='nopointsfordiscount',
                 value_name='nopointsfordiscount',isactive=True).first()
                 nopointsforvoucheruse_setup = Systemsetup.objects.filter(title='nopointsforvoucheruse',
@@ -9494,6 +9730,8 @@ class postaudViewset(viewsets.ModelViewSet):
                     dt_depositamt = "{:.2f}".format(sum_deposit_ids['dt_deposit'])
                 else:
                     dt_depositamt = "0.00" 
+
+                # print(payment_amt,dt_depositamt,"uu")
 
                 if float(payment_amt) <= float(dt_depositamt):
                     pickamt = float(payment_amt)
@@ -9552,7 +9790,7 @@ class postaudViewset(viewsets.ModelViewSet):
                         if not departreward_ids or not brandreward_ids:
                             # print("if not dept brand")
                             eachreward_ids = RewardPolicy.objects.filter(cust_type=cust_class,isactive=True,
-                            item_divids__itm_code=int(ecl.dt_itemnoid.item_div),dept_ids=None,brand_ids=None).order_by('-pk')[:1]
+                            item_divids__itm_code=int(ecl.dt_itemnoid.item_div)).order_by('-pk')[:1]
                             # print(eachreward_ids,"eachreward_ids")
                             
                         # print(eachreward_ids,"eachreward_ids")
@@ -11135,9 +11373,21 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                     h['invoice_header'] = "Void Transaction" 
                 else:
                     h['invoice_header'] = ''
+            
+            discreason_setup = Systemsetup.objects.filter(title='Invoice show discount reason',
+            value_name='Invoice show discount reason',isactive=True).first()
+            if discreason_setup and discreason_setup.value_data == 'True':
+                discreason = True
+            else:
+                discreason = False 
 
+            discper_setup = Systemsetup.objects.filter(title='Invoice show discount % $',
+            value_name='Invoice show discount % $',isactive=True).first()
+            if discper_setup and discper_setup.value_data == 'True':
+                discper = True
+            else:
+                discper = False      
                            
-
 
             dtl_serializer = PosdaudSerializer(daud, many=True)
             dtl_data = dtl_serializer.data
@@ -11195,6 +11445,15 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                 #     line_no=d_obj.dt_lineno).values_list('times', flat=True).distinct()))
                 #     if helper_ids != []:
                 #         d['dt_itemdesc'] = d['dt_itemdesc']+" "+"TD - "+str(len(helper_ids))
+                
+                if discreason == True and d_obj.dt_discdesc:
+                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+"Discount Reason : "+ str(d_obj.dt_discdesc)
+
+                if discper == True and d_obj.dt_discpercent:
+                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount % : "+ str(int(d_obj.dt_discpercent)) +"%"
+                elif discper == True and d_obj.dt_discamt:
+                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount $ : "+ str(int(d_obj.dt_discamt)) +"$"
+
 
 
                 if d['dt_status'] == 'SA' and d['record_detail_type'] == "TD":
@@ -11369,7 +11628,374 @@ class CustomerReceiptPrintList(generics.ListAPIView):
             return Response(data=result, status=status.HTTP_200_OK)
         except Exception as e:
            invalid_message = str(e)
-           return general_error_response(invalid_message)     
+           return general_error_response(invalid_message)   
+
+
+class CustomerReceiptPrintBeforeCheckoutList(APIView):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+
+    def post(self, request, format='json'):
+        try:
+            if request.GET.get('cart_id',None) is None:
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give cart_id!!",'error': True} 
+                return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+            site = fmspw.loginsite  
+            cart_id = request.GET.get('cart_id',None)
+            cart_date = datetime.date.today()
+            cust_id = request.GET.get('cust_id',None)
+
+            cust_obj = Customer.objects.filter(pk=cust_id,cust_isactive=True).only('pk','cust_isactive').first()
+            if not cust_obj:
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Customer ID does not exist!!",'error': True} 
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+            if not request.data:
+                result = {'status': status.HTTP_400_BAD_REQUEST,
+                "message":"Payment mode box should not be empty!!",'error': True} 
+                return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+            type_ex = ['VT-Deposit','VT-Top Up','VT-Sales']
+            queryset = ItemCart.objects.filter(isactive=True).filter(cust_noid=cust_obj,cart_id=cart_id,cart_date=cart_date,
+            cart_status="Inprogress",isactive=True,is_payment=False).exclude(type__in=type_ex).order_by('lineno')
+            print(queryset,"queryset")
+            hdr = queryset[:1] 
+            # print(hdr,"hdr")
+            if not queryset:
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Given Cart ID data does not exist!!",'error': True} 
+                return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+    
+
+            # data = dict()
+            # data["name"] = "ThePythonDjango.Com"
+            # data["DOB"] = "Jan 10, 2015"
+
+            # template = get_template('invoice.html')
+            # html = template.render(data)
+            # pdf = pdfkit.from_string(html, False)
+            # PREVIEW_PATH = "customer_receipt_beforepay_" + str(str(hdr[0].cart_id)) + ".pdf"
+
+            # file_path = os.path.join(settings.PDF_ROOT, PREVIEW_PATH)
+            # with open(file_path, 'wb') as fh:
+            #     fh.write(pdf)
+
+            # # ip_link = "http://"+request.META['HTTP_HOST']+"/media/pdf/customer_receipt_"+str(hdr[0].sa_transacno_ref)+".pdf"
+            # ip_link = str(SITE_ROOT) + "pdf/customer_receipt_beforepay_"+str(hdr[0].cart_id)+".pdf"
+
+
+        
+            # res_data = {'pdf_link': ip_link}
+            # result = {'status': status.HTTP_200_OK,"message":"Listed succesfully",
+            # 'error': False, 'data': res_data}
+            # return Response(data=result, status=status.HTTP_200_OK)
+
+          
+           
+            title = Title.objects.filter(product_license=site.itemsite_code).order_by("pk").first()
+            custsign_ids = Tempcustsign.objects.filter(cart_id=cart_id).order_by("-pk").first()
+           
+
+            if title:
+                pic = False
+                if title.logo_pic:
+                    # pic = str(ip)+str(title.logo_pic.url)
+                    pic = str(SITE_ROOT)+str(title.logo_pic) 
+
+            taud_data  = [] ; checkgt = []
+            tot_payamt = 0.0
+            tot_gst = 0;sa_totgst = 0 ;pay_actamt = 0
+            for idx, req in enumerate(request.data, start=1):
+                paytablegt = Paytable.objects.filter(pk=req['pay_typeid'],pay_isactive=True).first()
+                stringgt = paytablegt.gt_group
+                st_newgt= "".join(stringgt.split())
+                if st_newgt == 'GT1':
+                    sa_totgst += req['pay_gst']
+                    if 'GT1' not in checkgt:
+                        checkgt.append("GT1") 
+
+                if st_newgt == 'GT2':
+                    if 'GT2' not in checkgt: 
+                        checkgt.append("GT2")
+
+                pay_amt = float(req['pay_amt'])
+                pay = str("{:.2f}".format((pay_amt)))
+                req['pay_amt'] = pay
+                tot_payamt += pay_amt
+                pay_gst = float(req['pay_gst'])
+                tot_gst += pay_gst
+                pay_actamt += float(req['pay_amt'])
+                # val = {'pay_mode': t['pay_type_name'],'pay_amt':pay}
+                req['pay_description'] = paytablegt.pay_description
+                req['pay_rem1'] = req['pay_rem1'] if 'pay_rem1' in req and req['pay_rem1'] else ""
+                taud_data.append(req)
+            
+            taxable = pay_actamt - tot_gst
+
+            # depositv_ids = queryset.filter().aggregate(deposit=Coalesce(Sum('deposit'), 0))
+            # if depositv_ids:
+            #     if tot_payamt < depositv_ids['deposit']:
+            #         result = {'status': status.HTTP_400_BAD_REQUEST,
+            #         "message":"Pay amount should not be less than the Billable Amount!!",'error': True} 
+            #         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+                    
+
+            hdr_serializer = ItemCartCustomerReceiptSerializer(hdr, many=True)
+            hdr_data = hdr_serializer.data
+            for h in hdr_data:
+               
+                date = datetime.datetime.strptime(str(h['cart_date']), '%Y-%m-%d').strftime("%d-%b-%Y")
+                
+                time = datetime.datetime.now()
+                current_time = time.strftime("%H:%M:%S")
+               
+                Time = str(current_time).split(":")
+
+                time = Time[0]+":"+Time[1]
+                dtime = datetime.datetime.strptime(str(time),"%H:%M").strftime("%I:%M:%S %p")
+              
+                h['invoice_header'] = ''
+                depo_ids = queryset.filter(type__in=['Deposit','Top Up'])
+                sales_ids = queryset.filter(type='Sales') 
+                void_ids = queryset.filter(type__in=['VT-Deposit','VT-Top Up','VT-Sales'])
+                if not "GT1" in checkgt:
+                    sa_transacno_type = "Non Sales"
+                    
+                focnot_ids = queryset.filter(is_foc=False) 
+                if not focnot_ids:
+                    sa_transacno_type = "Non Sales"
+                
+                if depo_ids:
+                    h['invoice_header'] = "TAX INVOICE"
+                elif sales_ids:  
+                    h['invoice_header'] = "Render Service Receipt" 
+                elif sa_transacno_type == "Non Sales":  
+                    h['invoice_header'] = "Non Sales" 
+                elif void_ids:  
+                    h['invoice_header'] = "Void Transaction" 
+                else:
+                    h['invoice_header'] = ''
+                invoice_header = h['invoice_header']
+
+
+            dtl_serializer = ItemCartdaudSerializer(queryset, many=True)
+            dtl_data = dtl_serializer.data
+            tot_qty = 0;tot_trans = 0 ; tot_depo = 0; tot_bal = 0;balance = 0; tot_price=0;tot_disc = 0
+            total_netprice = 0;advance =0;tot_dt_price = 0
+            
+            for idx, d in enumerate(dtl_data, start=1):
+                d_obj = ItemCart.objects.filter(pk=d['id']).first()
+                tot_price += d_obj.price
+                total_netprice += d_obj.price * d_obj.quantity
+                package_desc = []; packages = ""
+                if d['itemtype'] == "PACKAGE":
+                    package_dtl = PackageDtl.objects.filter(package_code=d['itemcode'],isactive=True)
+                    for i in package_dtl:
+                        desc = i.description
+                        package_desc.append(desc)
+                    packages = tuple(package_desc)
+                
+                
+                d['sales_staff'] = ','.join(list(set([v.display_name for v in d_obj.sales_staff.filter() if v.display_name])))
+                d['work_staff'] = ','.join(list(set([v.display_name for v in d_obj.service_staff.filter() if v.display_name])))
+                if d['isfoc'] == True and not d['holditemqty']:
+                    d['dt_itemdesc'] = d['dt_itemdesc']
+                elif d['dt_status'] == 'Deposit' and d['itemtype'] == "PACKAGE":
+                    d['dt_itemdesc'] = d['dt_itemdesc']+"-"+str(packages)    
+                elif d['dt_status'] == 'Sales' and d['record_detail_type'] == "TD":
+                    d['dt_transacamt'] = ""
+                    d['dt_deposit'] = ""
+                    balance = ""
+                    d['balance'] = ""
+                    d['dt_itemdesc'] = d['record_detail_type'] +"-"+ d['dt_itemdesc']
+                elif d['dt_status'] == 'Top Up' and d['record_detail_type'] in ['TP Service','TP Product','TP Prepaid']:
+                    d['dt_itemdesc'] = d['record_detail_type'] +"-"+ d['dt_itemdesc']
+                elif d['dt_status'] in ['VT-Deposit','VT-Top Up','VT-Sales']:
+                    d['dt_itemdesc'] = d['dt_itemdesc']    
+                elif d['dt_status'] == 'VT-Sales' and d['record_detail_type'] == "TD":
+                    d['dt_itemdesc'] = d['dt_itemdesc']
+                elif d['dt_status'] in ['VT-Deposit','VT-Top Up','VT-Sales'] and d['record_detail_type'] in ['TP Service','TP Product','TP Prepaid']:
+                    d['dt_itemdesc'] = d['dt_itemdesc']
+                elif d['holditemqty'] and d['record_detail_type'] == 'Product':  
+                    d['dt_itemdesc'] = d['record_detail_type'] +"-"+ d['dt_itemdesc']+"(H"+str(d['holditemqty'])+")"                    
+                else:   
+                    if d['record_detail_type']: 
+                        d['dt_itemdesc'] = d['record_detail_type'] +"-"+ d['dt_itemdesc']
+
+           
+                if d['dt_status'] == 'SA' and d['record_detail_type'] == "TD":
+                    d['dt_transacamt'] = ""
+                    d['dt_deposit'] = ""
+                    balance = ""
+                    d['balance'] = ""
+                else:    
+                    d['dt_transacamt'] = "{:.2f}".format(float(d_obj.trans_amt))
+                    d['dt_deposit'] = "{:.2f}".format(float(d['dt_deposit']))
+                    balance = float(d_obj.trans_amt) - float(d['dt_deposit'])
+                    d['balance'] = "{:.2f}".format(float(balance))
+                    tot_trans += float(d_obj.trans_amt)
+                    tot_depo += float(d['dt_deposit'])
+                    tot_bal += float(balance)
+
+                if d['record_detail_type'] == "TD":
+                    d['staffs'] = "/"+ ','.join(list(set([v.display_name for v in d_obj.service_staff if v.display_name])))
+                else:
+                    d['staffs'] = d['staffs']    
+
+                tot_qty += int(d['dt_qty'])
+                tot_dt_price += d_obj.price
+                d['no'] = idx
+                d['dt_qty'] = d['dt_qty']
+                d['dt_price'] = "{:.2f}".format(float(d['dt_price']))
+                d['discount'] = "{:.2f}".format(float(float(d_obj.price) - d_obj.discount_price))
+                totdisc = float(d_obj.price) - d_obj.discount_price
+                tot_disc += totdisc
+
+            outstanding = tot_trans - tot_depo
+            
+            paydate =  hdr[0].cart_date
+
+            gst = GstSetting.objects.filter(isactive=True,activefromdate__date__lte=paydate,
+            activetodate__date__gte=paydate).first()
+
+             
+            tax_amt = sa_totgst
+          
+            # value = postaud_calculation(self, request, queryset, paydate)
+            # rounding = "{:.2f}".format(float(value['sa_Round']))
+            rounding = 0
+
+          
+
+            gst_lable = ""; gstlable = ""
+            # if site.site_is_gst == True:
+            #     if site.is_exclusive == True:
+            #         if gst and gst.item_value:
+            #             gst_lable = "GST (EXC "+str(int(gst.item_value))+"%)"
+            #     elif site.is_exclusive == False: 
+            #         gstlable = "GST (INC)" 
+
+            sub_data = {'total_qty':str(tot_qty),'trans_amt':str("{:.2f}".format((tot_trans))),
+            'deposit_amt':str("{:.2f}".format((tot_depo))),'total_balance':str("{:.2f}".format((tot_bal))),
+            'subtotal':str("{:.2f}".format((tot_depo))),'billing_amount':"{:.2f}".format(float(tot_payamt)),
+            'tot_disc':str("{:.2f}".format((tot_disc))),
+            'pay_gst':str("{:.2f}".format(tot_gst)) if tot_gst else "0.00",
+            'taxable':  str("{:.2f}".format(taxable)) if taxable else "0.00",
+            'tot_dt_price' : tot_dt_price,
+            }        
+            
+            day = datetime.datetime.strptime(str(hdr[0].cart_date), '%Y-%m-%d').strftime('%a')
+
+            # treatopen_ids = False
+            # set_obj = False
+           
+            # prepaid_amt = 0.0   
+            
+            # credit_amt = "0.00"  
+           
+            path_custsign = None
+            if custsign_ids and custsign_ids.cust_sig:
+                path_custsign = BASE_DIR + custsign_ids.cust_sig.url
+            
+           
+            data = {'name': title.trans_h1 if title and title.trans_h1 else '', 
+            'address': title.trans_h2 if title and title.trans_h2 else '', 
+            'footer1':title.trans_footer1 if title and title.trans_footer1 else '',
+            'footer2':title.trans_footer2 if title and title.trans_footer2 else '',
+            'footer3':title.trans_footer3 if title and title.trans_footer3 else '',
+            'footer4':title.trans_footer4 if title and title.trans_footer4 else '',
+            'footer5':title.trans_footer5 if title and title.trans_footer5 else '',
+            'footer6':title.trans_footer6 if title and title.trans_footer6 else '',
+            'hdr': hdr[0], 'daud':dtl_data,'postaud':taud_data,'day':day,'fmspw':fmspw,
+            'date':date,'time':dtime,'percent':int(gst.item_value) if gst and gst.item_value else "0" ,'path':pic if pic else '','title':title if title else None,
+            'packages': str(packages),'site':site,
+            'title': title,
+            'custsign_ids':path_custsign if path_custsign else '',
+            'gst_reg_no': title.gst_reg_no if title and title.gst_reg_no else '',
+            'company_reg_no': title.company_reg_no if title and title.company_reg_no else '',
+            'gst':tax_amt,'rounding':rounding,
+            'invoice_header' : invoice_header,
+            }
+            data.update(sub_data)
+
+            template = get_template('customer_receipt_beforepay.html')
+            html = template.render(data)
+            pdf = pdfkit.from_string(html, False)
+            PREVIEW_PATH = "customer_receipt_beforepay_" + str(str(hdr[0].cart_id)) + ".pdf"
+
+            file_path = os.path.join(settings.PDF_ROOT, PREVIEW_PATH)
+            with open(file_path, 'wb') as fh:
+                fh.write(pdf)
+
+            ip_link = str(SITE_ROOT) + "pdf/customer_receipt_beforepay_"+str(hdr[0].cart_id)+".pdf"
+
+
+        
+            res_data = {'pdf_link': ip_link}
+            result = {'status': status.HTTP_200_OK,"message":"Listed succesfully",
+            'error': False, 'data': res_data}
+            return Response(data=result, status=status.HTTP_200_OK)
+
+
+            # template = get_template('invoice.html')
+            # html = template.render(data)
+            # output= pdfkit.from_string(html, output_path=False)
+            # response = HttpResponse(content_type="application/pdf")
+            # response.write(output)
+            # return response
+
+
+
+            # display = Display(visible=0, size=(800, 600))
+            # display.start()
+            # html = template.render(data)
+            # options = {
+            #     'margin-top': '.25in',
+            #     'margin-right': '.25in',
+            #     'margin-bottom': '.25in',
+            #     'margin-left': '.25in',
+            #     'encoding': "UTF-8",
+            #     'no-outline': None,
+                
+            # }
+            
+            # dst ="customer_receipt_beforepay_" + str(str(hdr[0].cart_id)) + ".pdf"
+
+                
+            # p=pdfkit.from_string(html,False,options={})
+            # response= HttpResponse(p, content_type='application/pdf')
+            # response['Content-Disposition']= 'attachment'
+            # return response
+            # PREVIEW_PATH = dst
+            # # pdf = FPDF() 
+
+            # # pdf.add_page() 
+            
+            # # pdf.set_font("Arial", size = 15) 
+            # file_path = os.path.join(settings.PDF_ROOT, PREVIEW_PATH)
+            # # pdf.output(file_path) 
+
+            # if p:
+            #     # file_path = os.path.join(settings.PDF_ROOT, PREVIEW_PATH)
+            #     report = os.path.isfile(file_path)
+            #     if report:
+            #         file_path = os.path.join(settings.PDF_ROOT, PREVIEW_PATH)
+            #         with open(file_path, 'wb') as fh:
+            #             fh.write(p)
+
+            #         # ip_link = "http://"+request.META['HTTP_HOST']+"/media/pdf/customer_receipt_"+str(hdr[0].sa_transacno_ref)+".pdf"
+            #         ip_link = str(SITE_ROOT) + "pdf/customer_receipt_beforepay_"+str(hdr[0].cart_id)+".pdf"
+
+        
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+
+
+  
+
 
 # class PayGroupViewset(viewsets.ModelViewSet):
 #     authentication_classes = [ExpiringTokenAuthentication]
@@ -12938,10 +13564,10 @@ class CustApptAPI(generics.ListAPIView):
         
         asystem_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
         value_name='Customeroutletrestrict',isactive=True).first()
-        if asystem_setup and asystem_setup.value_data == 'True':
-            queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
-        else:
-            queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
+        # if asystem_setup and asystem_setup.value_data == 'True':
+        #     queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
+        # else:
+        #     queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
         
         if self.request.GET.get('customeroutletrestrict',None) == '1':
             if asystem_setup and asystem_setup.value_data == 'True':
@@ -16674,6 +17300,9 @@ class StaffPlusViewSet(viewsets.ModelViewSet):
                             fmspwidss.pw_isactive = True
                             fmspwidss.save()
 
+                    if 'emp_pic' in request.data and request.data['emp_pic']:
+                        employee.emp_pic = request.FILES.get("emp_pic") 
+                        employee.save()
 
 
 
@@ -17656,12 +18285,12 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
         else:
             queryset = Customer.objects.filter(cust_isactive=True,site_code=site.itemsite_code).only('cust_isactive').order_by('-pk')
         
-        asystem_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
-        value_name='Customeroutletrestrict',isactive=True).first()
-        if asystem_setup and asystem_setup.value_data == 'True':
-            queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
-        else:
-            queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
+        # asystem_setup = Systemsetup.objects.filter(title='Customeroutletrestrict',
+        # value_name='Customeroutletrestrict',isactive=True).first()
+        # if asystem_setup and asystem_setup.value_data == 'True':
+        #     queryset = Customer.objects.filter(cust_isactive=True,or_key=site.itemsite_code).only('cust_isactive').order_by('-pk')
+        # else:
+        #     queryset = Customer.objects.filter(cust_isactive=True).exclude(site_code__isnull=True).only('cust_isactive').order_by('-pk')
         
 
         q = self.request.GET.get('search', None)
@@ -17984,6 +18613,8 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                                 
                     if k.pk:
                         if control_check == False:
+                            # result_3 = str(int(result_2) + 1).zfill(6)
+
                             control_obj.control_no = int(control_obj.control_no) + 1
                             control_obj.save()
 
@@ -17998,7 +18629,11 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                 customer_id=k) 
                                 cp.save()
                         
-                       
+                        # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=k.pk)
+                        # if not checkex_ids:
+                        #     CustomerExtended(cust_code=cus_code,cust_codeid=k,cust_name=k.cust_name
+                        #     ,site_code=site.itemsite_code,original_sitecode=site.itemsite_code).save()
+
 
                     if 'referredbyid' in request.data and request.data['referredbyid']:
                         ref_ids = CustomerReferral.objects.filter(cust_id__pk=k.pk,Site_Codeid__pk=site.pk)
@@ -18174,6 +18809,10 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                     sgn_unitno=request.data['sgn_unitno'] if 'sgn_unitno' in request.data and request.data['sgn_unitno'] else customer.sgn_unitno,
                     sgn_block=request.data['sgn_block'] if 'sgn_block' in request.data and request.data['sgn_block'] else customer.sgn_block,
                     sgn_street=request.data['sgn_street'] if 'sgn_street' in request.data and request.data['sgn_street'] else customer.sgn_street,
+                    oustanding_payment=request.data['oustanding_payment'] if 'oustanding_payment' in request.data and request.data['oustanding_payment'] else customer.oustanding_payment,
+                    cust_refer=request.data['cust_refer'] if 'cust_refer' in request.data and request.data['cust_refer'] else customer.cust_refer,
+                    cust_joindate=request.data['cust_joindate'] if 'cust_joindate' in request.data and request.data['cust_joindate'] else customer.cust_joindate,
+                    
                     )
 
                     if 'cust_corporate' in requestData and requestData['cust_corporate']:
@@ -18193,7 +18832,17 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                     username=fmspw.pw_userlogin,
                     user_loginid=fmspw,updated_at=timezone.now()).save()
 
-                  
+                    # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=customer.pk).first()
+                    # if not checkex_ids:
+                    #     CustomerExtended(cust_code=customer.cust_code,cust_codeid=customer,
+                    #     cust_name=customer.cust_name,site_code=customer.site_code
+                    #     ,original_sitecode=customer.site_code).save()
+                    # else:
+                    #     if checkex_ids:
+                    #         checkex_ids.cust_name = customer.cust_name
+                    #         checkex_ids.save()
+
+
 
                     if 'referredbyid' in request.data and request.data['referredbyid']:
                         ref_ids = CustomerReferral.objects.filter(cust_id__pk=customer.pk,Site_Codeid__pk=site.pk)
@@ -18910,28 +19559,32 @@ class RedeemPolicyViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             k = serializer.save()
             if item_divids:
-                if ',' in item_divids:
-                    res = item_divids.split(',')
-                elif item_divids == "0":
+                # if ',' in item_divids:
+                #     print("iff")
+                #     res = item_divids.split(',')
+                if item_divids == "0":
                     res = ItemDiv.objects.filter(itm_isactive=True,issellable=True).filter(~Q(itm_code=2)).order_by('-itm_seq')
                 else:
-                    res = item_divids.split(' ')
+                    res = item_divids.split(',')
                 for div in res:
                     k.item_divids.add(div)
             
             if dept_ids:
-                if ',' in dept_ids:
-                    dep_res = dept_ids.split(',') 
-                else:
-                    dep_res =  dept_ids.split(' ')
+                dep_res = dept_ids.split(',') 
+                # if ',' in dept_ids:
+                #     dep_res = dept_ids.split(',') 
+                # else:
+                #     dep_res =  dept_ids.split(' ')
+                    
                 for dept in dep_res:
                     k.dept_ids.add(dept)  
             
             if brand_ids:
-                if ',' in brand_ids:
-                    brand_res = brand_ids.split(',')
-                else:
-                    brand_res = brand_ids.split(' ') 
+                brand_res = brand_ids.split(',')
+                # if ',' in brand_ids:
+                #     brand_res = brand_ids.split(',')
+                # else:
+                #     brand_res = brand_ids.split(' ') 
 
                 for brand in brand_res:
                     k.brand_ids.add(brand)      
@@ -19377,21 +20030,43 @@ class EmployeeSecuritySettings(APIView):
         return Response(result, status=status.HTTP_200_OK)
 
 
-@api_view(['GET', ])
-@permission_classes((AllowAny,))
-def MultiLanguage(request):
-    lang_qs = Language.objects.filter(itm_isactive=True)
+# @api_view(['GET', ])
+# @permission_classes((AllowAny,))
+# def MultiLanguage(request):
+#     lang_qs = Language.objects.filter(itm_isactive=True)
 
-    responseDict = {}
-    for lang in lang_qs:
-        qs = MultiLanguageWord.objects.filter(language=lang).values('wordCode', 'word')
-        responseDict[lang.itm_desc] = list(qs)
+#     responseDict = {}
+#     for lang in lang_qs:
+#         qs = MultiLanguageWord.objects.filter(language=lang).values('wordCode', 'word')
+#         responseDict[lang.itm_desc] = list(qs)
 
-    response_data = {
-        "language": responseDict,
-        "message": "Listed successfuly"
-    }
-    return JsonResponse(response_data, status=status.HTTP_200_OK)
+#     response_data = {
+#         "language": responseDict,
+#         "message": "Listed successfuly"
+#     }
+#     return JsonResponse(response_data, status=status.HTTP_200_OK)
+
+class MultiLanguage(GenericAPIView):
+    authentication_classes = ()
+    permission_classes = ()
+    serializer_class = []  
+
+    def get(self, request):
+        lang_qs = Language.objects.filter(itm_isactive=True)
+
+        responseDict = {}
+        for lang in lang_qs:
+            qs = MultiLanguageWord.objects.filter(language=lang).values('wordCode', 'word')
+            responseDict[lang.itm_desc] = list(qs)
+
+        response_data = {
+            'status': status.HTTP_200_OK,"message": "Listed successfuly",
+            'error': False,
+            "language": responseDict,
+        }
+        return JsonResponse(response_data, status=status.HTTP_200_OK)
+
+
 
 @api_view(['GET', ])
 @permission_classes((AllowAny,))
@@ -19413,6 +20088,7 @@ def MultiLanguage_list(request):
         "message": "Listed successfuly"
     }
     return JsonResponse(response_data, status=status.HTTP_200_OK)
+
 
 
 
@@ -20925,7 +21601,7 @@ class CustomerPointsViewsets(viewsets.ModelViewSet):
             if not queryset:
                 raise Exception('Itemcart is does not exist!!')   
 
-            print(service_only,product_only)
+            # print(service_only,product_only)
             enterpt_amt = float(request.GET.get('enter_pointamt',0))
 
             now_point = 0;
@@ -20947,63 +21623,60 @@ class CustomerPointsViewsets(viewsets.ModelViewSet):
             if custredeem_ids and now_point > 0:
 
                 # table_list = [ for i in custredeem_ids]
-                redeem_currency = 0
+                redeem_currency = 0; enter_amount = []
                 for t in custredeem_ids:
                     bro_obj = RedeemPolicy.objects.filter(pk=t.pk).order_by('-pk').first()
+                    # check_div = list(set(bro_obj.item_divids.filter().values_list('itm_code', flat=True).distinct()))
+                    # print(check_div,"kk")
                     if bro_obj and bro_obj.point_value and bro_obj.point_value > 0 and bro_obj.cur_value and bro_obj.cur_value > 0:
                         item_div_desc = '';dept_ids_desc='';brand_ids_desc=''
                         item_divids = bro_obj.item_divids.filter(issellable=True)
                         
                         if item_divids.exists():
-                            item_div_desc = ','.join([v.itm_desc for v in item_divids if v.itm_desc])
+                            item_div_desc = ','.join(list(set([v.itm_desc for v in item_divids if v.itm_desc])))
 
                         if bro_obj.dept_ids.all().exists():
-                            dept_ids_desc = ','.join([i.itm_desc for i in bro_obj.dept_ids.all() if i.itm_desc])
+                            dept_ids_desc = ','.join(list(set([i.itm_desc for i in bro_obj.dept_ids.all() if i.itm_desc])))
 
                         if bro_obj.brand_ids.all().exists():
-                            brand_ids_desc = ','.join([i.itm_desc for i in bro_obj.brand_ids.all() if i.itm_desc]) 
+                            brand_ids_desc = ','.join(list(set([i.itm_desc for i in bro_obj.brand_ids.all() if i.itm_desc]))) 
     
                         val = {'id': bro_obj.pk,'cust_type':bro_obj.cust_type,
                             'cur_value':"{:.2f}".format(float(bro_obj.cur_value)) if bro_obj.cur_value  else "0.00",
                             'point_value': "{:.2f}".format(float(bro_obj.point_value)) if bro_obj.point_value  else "0.00",
                             'useamt': "0.00",'item_divids_desc':item_div_desc,'dept_ids_desc':dept_ids_desc,
                             'brand_ids_desc':brand_ids_desc}
+                        
+                        #total currency available enter_amount
+                        currency_avail = int(now_point / bro_obj.point_value) * bro_obj.cur_value
+                        redeem_currency += currency_avail 
 
+                        #enter_amount ranges
+                        # cur_value = bro_obj.cur_value
+                        # if now_point >= cur_value:
+                        #     if cur_value not in enter_amount:
+                        #         enter_amount.append(cur_value)
+                        #         cur_value 
+                        
+                        #useamount calculation
                         useamt = 0
                         if bro_obj.item_divids.filter(itm_code=3).exists():
-                            print(bro_obj.item_divids)
-                            print( bro_obj.cur_value," bro_obj.cur_value")  
+                            # print(bro_obj.item_divids)
+                            # print( bro_obj.cur_value," bro_obj.cur_value")  
                             if bro_obj.cur_value < service_only:
-                                redeem_currency += bro_obj.cur_value
                                 val.update({'useamt':  "{:.2f}".format(bro_obj.cur_value)})
                             elif service_only < bro_obj.cur_value:
-                                redeem_currency += service_only
                                 val.update({'useamt':  "{:.2f}".format(service_only)})    
                         elif bro_obj.item_divids.filter(itm_code=1).exists():
                             if bro_obj.cur_value < product_only:
-                                redeem_currency += bro_obj.cur_value
                                 val.update({'useamt':  "{:.2f}".format(bro_obj.cur_value)})
                             elif product_only < bro_obj.cur_value:
-                                redeem_currency += product_only
                                 val.update({'useamt':  "{:.2f}".format(product_only)}) 
-                        
-                        # if enterpt_amt == bro_obj.point_value:
-                        #     val.update({'useamt':  "{:.2f}".format(bro_obj.cur_value)})
-                        # elif enterpt_amt < bro_obj.point_value:
-                        #     val.update({'useamt': "0.00"}) 
-                        # elif enterpt_amt > bro_obj.point_value: 
-                        #     useamt = 0    
-                        #     amt = enterpt_amt
-                        #     while amt >= bro_obj.point_value:
-                        #         useamt += bro_obj.cur_value
-                        #         amt = amt - bro_obj.point_value
-
-                        #     val.update({'useamt': "{:.2f}".format(useamt)}) 
-                        
+                                
                                  
                         if val != {}:
                             table_list.append(val)
-                            header_data.update({'redeem_currency': "{:.2f}".format(redeem_currency)})
+                            header_data.update({'redeem_currency': redeem_currency})
 
 
                 result = {'status': status.HTTP_200_OK,"message": "Listed Succesfully",'error': False, 
@@ -21190,9 +21863,14 @@ class StripeCustomerCreateAPIView(GenericAPIView):
                     customer = stripe.Customer.create(name=customer_name,
                     email=email,phone=phone)
                     extra_msg = "Customer Created Succesfully"
+                    # ex_ids = CustomerExtended.objects.filter(cust_codeid__pk=cust_obj.pk).first()    
+                    # if ex_ids:
+                    #     ex_ids.stripe_id = customer.id
+                    #     ex_ids.save()
                     if cust_obj:
                         cust_obj.stripe_id = customer.id
                         cust_obj.save()
+    
 
                 else:
                     customer = customer_data[0]
@@ -24734,6 +25412,8 @@ class OutletRequestCustomerViewset(viewsets.ModelViewSet):
                     raise Exception('Please give Customer id!!.') 
 
                 cust_id = request.data['cust_id']
+                is_permanent = request.data['is_permanent']  
+
                 # if not 'site_id' in request.data or not request.data['site_id']:
                 #     raise Exception('Please give Site id!!.')
                 # site_id = request.data['site_id']
@@ -24741,9 +25421,12 @@ class OutletRequestCustomerViewset(viewsets.ModelViewSet):
                 if not cust_obj:
                     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Customer id Does't Exist!!",'error': True} 
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+                
+                
                 # site_obj = ItemSitelist.objects.filter(pk=site_id,itemsite_isactive=True).order_by('-pk').first()
-                # if not site_obj:
-                #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Site id Does't Exist!!",'error': True} 
+                # if cust_obj.site_code == site.itemsite_code:
+                #     result = {'status': status.HTTP_400_BAD_REQUEST,
+                #     "message":"Customer Sitecode and logined sitecode same so can't transfer!!",'error': True} 
                 #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
                 
                 haud_ids =  PosHaud.objects.filter(isvoid=False,sa_custno=cust_obj.cust_code,
@@ -24755,6 +25438,38 @@ class OutletRequestCustomerViewset(viewsets.ModelViewSet):
                     result = {'status': status.HTTP_400_BAD_REQUEST,
                     "message":"Already Customer Request created for this given site!!",'error': True} 
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+
+                if is_permanent == True:
+                    log =OutletRequestLog(log_date=date.today(),cust_code=cust_obj.cust_code,cust_name=cust_obj.cust_name,
+                    from_site=cust_obj.or_key,requesting_site=site.itemsite_code,
+                    last_transaction=haud_ids.sa_transacno if haud_ids and haud_ids.sa_transacno else "",
+                    request_by=fmspw.pw_userlogin,
+                    req_date=date.today(),req_status="Permanent Transfer",req_staff_code=fmspw.Emp_Codeid.emp_code)
+                    log.save()
+                    if haud_ids and haud_ids.sa_date:
+                        log.last_transaction_date = haud_ids.sa_date
+                        log.save()
+
+                    # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=cust_obj.pk,
+                    # cust_code=cust_obj.cust_code).first()
+                    # if not checkex_ids:
+                    #     CustomerExtended(cust_code=cust_obj.cust_code,cust_codeid=cust_obj,
+                    #     cust_name=cust_obj.cust_name,site_code=site.itemsite_code
+                    #     ,original_sitecode=cust_obj.site_code).save()
+                    # else:
+                    #     if checkex_ids:
+                    #         checkex_ids.site_code = site.itemsite_code
+                    #         checkex_ids.save()    
+
+                    cust_obj.or_key = site.itemsite_code
+                    cust_obj.site_code = site.itemsite_code
+                    cust_obj.Site_Codeid = site
+                    cust_obj.save()
+                    result = {'status': status.HTTP_200_OK,"message":"Customer Transferred to this {0} Outlet Permanently".format(str(site.itemsite_code)),
+                    'error': False}
+                    return Response(data=result, status=status.HTTP_200_OK)
+                 
+
                 
                 # print(date.today(),"date.today()")
                 asystem_setup = Systemsetup.objects.filter(title='outletrequestmanualrelease',
@@ -24797,6 +25512,116 @@ class OutletRequestCustomerViewset(viewsets.ModelViewSet):
             invalid_message = str(e)
             return general_error_response(invalid_message)
     
+
+   
+class PrepaidValidperiodAPIView(generics.ListAPIView):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = PrepaidValidperiod.objects.filter(prepaid_valid_isactive=True).order_by('prepaid_valid_days')
+    serializer_class = PrepaidValidperiodSerializer
+
+    def list(self, request):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            if queryset:
+                serializer = self.get_serializer(queryset, many=True)
+                result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 'data':  serializer.data}
+            else:
+                serializer = self.get_serializer()
+                result = {'status': status.HTTP_204_NO_CONTENT,"message":"No Content",'error': False, 'data': []}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)      
+
+
+class AvailableTimeSlotsAPIView(GenericAPIView):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = []
+
+    # def check_slots():
+    #     if query_set.time07 == False and "07:00" not in val['time_slots']:
+    #         val['time_slots'].append("07:00")
+
+
+
+    def get(self, request):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+            site = fmspw.loginsite
+            Item_Codeid = self.request.GET.get('Item_Codeid',None)
+            if not Item_Codeid:
+                raise ValueError("Please give Item_Codeid!!") 
+            given_date = self.request.GET.get('given_date',None)
+            if not given_date:
+                raise ValueError("Please select given_date!!") 
+            stock_obj = Stock.objects.filter(pk=Item_Codeid,item_isactive=True).first()
+            if stock_obj.srv_duration is None or stock_obj.srv_duration == 0.0:
+                srvduration = 60
+            else:
+                srvduration = stock_obj.srv_duration  
+            systemsetup_dur = Systemsetup.objects.filter(title='AppointmentServiceDurationAdd'
+            ,value_name='AppointmentServiceDurationAdd',isactive=True).first()       
+
+            if systemsetup_dur and systemsetup_dur.value_data:     
+                stkduration = int(srvduration) + int(systemsetup_dur.value_data)
+            else:
+                stkduration = int(srvduration)
+            # print(stkduration,"stkduration")
+            hrs = '{:02d}:{:02d}'.format(*divmod(stkduration, 60))
+            print(hrs,"hrs")
+            # dict_v['add_duration'] = hrs
+            # dict_v['srv_duration'] = str(srvduration)+" "+"Mins"
+            
+            emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,
+            isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True
+            ).values_list('Emp_Codeid', flat=True).distinct()))
+            print(emp_siteids,"emp_siteids")
            
+            queryset = list(set(ScheduleMonth.objects.filter(itm_date=given_date,Emp_Codeid__pk__in=emp_siteids,
+            site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).values_list('Emp_Codeid', flat=True).distinct()))
+            print(queryset,"queryset")
+            main_lst = []
+            time_date ={'time07': "07:00", 'time0730': "07:30", 'time08': "08:00", 
+            'time0830': "08:30", 'time09': "09:00", 'time0930': "09:30", 'time10': "10:00", 
+            'time1030': "10:30", 'time11': "11:00", 'time1130': "11:30", 'time12': "12:00", 
+            'time1230': "12:30", 'time13': "13:00", 'time1330': "13:30", 'time14': "14:00", 
+            'time1430': "14:30", 'time15': "15:00", 'time1530': "15:30", 'time16': "16:00", 
+            'time1630': "16:30", 'time17': "17:00", 'time1730': "17:30", 'time18': "18:00", 
+            'time1830': "18:30", 'time19': "19:00", 'time1930': "19:30", 'time20': "20:00", 
+            'time2030': "20:30", 'time21': "21:00", 'time2130': "21:30", 'time22': "22:00", 
+            'time2230': "22:30", 'time23': "23:00", 'time2330': "23:30"}
+            for i in queryset:
+                empobj = Employee.objects.filter(pk=i,emp_isactive=True).first()
+                if empobj:
+                    val = {'emp_id': i,'emp_name': empobj.display_name, 'time_slots': [],
+                    }
+                    query_set = ScheduleMonth.objects.filter(itm_date=given_date,Emp_Codeid__pk=i,
+                    site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).first()
+                    if query_set:
+                        field_lst = ScheduleMonth.objects.filter(pk=query_set.pk
+                        ).values('time07','time0730','time08',
+                        'time0830','time09','time0930','time10','time1030','time11',
+                        'time1130','time12','time1230','time13','time1330','time14',
+                        'time1430','time15','time1530','time16','time1630','time17',
+                        'time1730','time18','time1830','time19','time1930','time20',
+                        'time2030','time21','time2130','time22','time2230','time23',
+                        'time2330')[0]
 
-
+                        print(field_lst,"field_lst")
+                        for key in field_lst:
+                            print(key,"key")
+                            if field_lst[key] == False and time_date[key] not in val['time_slots']:
+                                val['time_slots'].append(time_date[key])
+                        main_lst.append(val)            
+                     
+    
+            # serializer = ScheduleMonthSerializer(queryset, many=True)
+            
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data':  main_lst,'add_duration': hrs}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 

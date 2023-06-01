@@ -9,9 +9,9 @@ DepositAccount, CustomerPoint, MrRewardItemType,Smsreceivelog,Systemsetup,Treatm
 CustomerTitle,ItemDiv,Tempcustsign,CustomerDocument,TreatmentPackage,ContactPerson,ItemFlexiservice,
 termsandcondition,Participants,ProjectDocument,Dayendconfirmlog,CustomerPointDtl,
 CustomerReferral,MGMPolicyCloud,sitelistip,DisplayCatalog,DisplayItem,ItemUomprice,ItemUom,
-ItemBatch,OutletRequestLog)
+ItemBatch,OutletRequestLog,PrepaidOpenCondition,PrepaidValidperiod,ScheduleMonth,ItemBatchSno)
 from cl_app.models import ItemSitelist, SiteGroup
-from custom.models import EmpLevel,Room,VoucherRecord
+from custom.models import EmpLevel,Room,VoucherRecord,ItemCart
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth import authenticate, get_user_model, password_validation
@@ -92,6 +92,8 @@ class UserLoginSerializer(serializers.Serializer):
         'invalid' : _('Salon Does not match with User salon.'),
         'site_notmapped' : _('Users is not allowed to login in this site'),
         'sitegrp_notmapped' : _('Site Group is not mapped'),
+        'notlinked_account': _('Emp_Codeid is not mapped in Fmspw.'),
+
 
     }
 
@@ -112,10 +114,19 @@ class UserLoginSerializer(serializers.Serializer):
                     raise serializers.ValidationError(self.error_messages['inactive_account'])
 
                 fmspw = Fmspw.objects.filter(user=self.user.id,pw_isactive=True)
+                
                 if not fmspw:
                     raise serializers.ValidationError(self.error_messages['inactive_account'])
 
-                emp = fmspw[0].Emp_Codeid.pk
+                emp = fmspw[0].Emp_Codeid.pk if fmspw[0].Emp_Codeid else False
+                if not emp:
+                    raise serializers.ValidationError(self.error_messages['notlinked_account'])
+                
+                if emp:
+                    logstaff = Employee.objects.filter(pk=fmspw[0].Emp_Codeid.pk,emp_isactive=True).first()     
+                    if not logstaff:
+                        raise serializers.ValidationError(self.error_messages['inactive_account'])
+
                 #sitelist_ids = EmpSitelist.objects.filter(Emp_Codeid=emp,Site_Codeid=branch[0].pk,isactive=True)
                 #if not sitelist_ids:
                 #    raise serializers.ValidationError(self.error_messages['site_notmapped'])
@@ -1584,13 +1595,54 @@ class PoshaudSerializer(serializers.ModelSerializer):
         model = PosHaud
         fields = ['id','sa_custno','sa_custname','sa_date','sa_time']
 
+class ItemCartCustomerReceiptSerializer(serializers.ModelSerializer):
+    sa_custname = serializers.CharField(source='cust_noid.cust_name',required=False)
+
+    class Meta:
+        model = ItemCart
+        fields = ['id','customercode','sa_custname','cart_date']
+
+
 class PosdaudSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='pk',required=False)
 
     class Meta:
         model = PosDaud
         fields = ['id','dt_itemdesc','dt_qty','dt_deposit','record_detail_type','dt_price',
-        'dt_status','itemcart','staffs','isfoc','holditemqty','trmt_done_staff_name','dt_combocode',]
+        'dt_status','itemcart','staffs','isfoc','holditemqty','trmt_done_staff_name','dt_combocode']
+
+class ItemCartdaudSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='pk',required=False)
+    dt_itemdesc = serializers.CharField(source='itemdesc',required=False)
+    dt_qty = serializers.IntegerField(source='quantity',required=False)
+    dt_deposit = serializers.FloatField(source='deposit',required=False)
+    record_detail_type = serializers.CharField(source='recorddetail',required=False)
+    dt_price = serializers.FloatField(source='price',required=False)
+    isfoc = serializers.BooleanField(source='is_foc',required=False)
+    dt_status = serializers.CharField(source='type',required=False)
+    staffs  = serializers.SerializerMethodField() 
+    dt_amt = serializers.FloatField(source='trans_amt',required=False)
+
+    def get_staffs(self, obj):
+        sales = "";service = ""
+        if obj.sales_staff.exists(): 
+            sales = ','.join(list(set([v.display_name for v in obj.sales_staff.filter() if v.display_name])))
+
+        if obj.service_staff.exists():
+            service = ','.join(list(set([v.display_name for v in obj.service_staff.filter() if v.display_name])))
+
+        var = sales+" "+"/"+" "+ service
+        
+        return var       
+
+    # 'staffs''trmt_done_staff_name',
+    # ,itemcart,staffs,dt_combocode
+
+    class Meta:
+        model = ItemCart
+        fields = ['id','dt_itemdesc','dt_qty','dt_deposit','record_detail_type','itemtype','dt_price',
+        'dt_status','isfoc','holditemqty','itemcode','staffs','dt_amt']
+
 
 class PostaudprintSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='pk',required=False)
@@ -1841,11 +1893,19 @@ class CustApptSerializer(serializers.ModelSerializer):
         fmspw = Fmspw.objects.filter(user=request.user, pw_isactive=True).order_by('-pk')
         site = fmspw[0].loginsite
 
-        iscurrent = ""
+        iscurrent = False
         if instance.site_code == site.itemsite_code:
             iscurrent = True
         elif instance.site_code != site.itemsite_code:
             iscurrent = False
+
+        isoutlet_restrict = False
+        if instance.or_key:
+            if instance.or_key == site.itemsite_code:
+                isoutlet_restrict = True
+            elif instance.or_key != site.itemsite_code:
+                isoutlet_restrict = False    
+
         contactperson = []
 
         if instance.cust_corporate == True:
@@ -1870,7 +1930,7 @@ class CustApptSerializer(serializers.ModelSerializer):
         'cust_corporate': instance.cust_corporate,
         'contactperson': contactperson,
         'outstanding_amt': "{:.2f}".format(float(instance.outstanding_amt)) if instance.outstanding_amt else "0.00",
-        'cust_joindate':cust_joindate,'or_key':instance.or_key }
+        'cust_joindate':cust_joindate,'or_key':instance.or_key,'isoutlet_resrict':isoutlet_restrict}
         return mapped_object    
 
    
@@ -2655,6 +2715,8 @@ class StaffPlusSerializer(serializers.ModelSerializer):
         request = self.context['request']
         site_list = request.data.get('site_list',"").split(",")
         # print(site_list,"site_list")
+        if 'emp_pic' in validated_data and validated_data['emp_pic']:
+            validated_data.pop('emp_pic')
 
         instance.emp_name = validated_data.get("emp_name", instance.emp_name)
         instance.display_name = validated_data.get("display_name", instance.display_name)
@@ -2664,7 +2726,7 @@ class StaffPlusSerializer(serializers.ModelSerializer):
         instance.emp_dob = validated_data.get("emp_dob", instance.emp_dob)
         instance.emp_joindate = validated_data.get("emp_joindate", instance.emp_joindate)
         instance.shift = validated_data.get("shift", instance.shift)
-        instance.emp_pic = validated_data.get("emp_pic", instance.emp_pic)
+        # instance.emp_pic = validated_data.get("emp_pic", instance.emp_pic)
         instance.EMP_TYPEid = validated_data.get("EMP_TYPEid", instance.EMP_TYPEid)
         instance.defaultSiteCodeid = validated_data.get("defaultSiteCodeid", instance.defaultSiteCodeid)
         instance.defaultsitecode = instance.defaultSiteCodeid.itemsite_code if instance.defaultSiteCodeid else None
@@ -2912,6 +2974,14 @@ class CustomerPlusSerializer(serializers.ModelSerializer):
         except:
             pass
 
+        isoutlet_restrict = False
+        if data['or_key']:
+            if data['or_key'] == site.itemsite_code:
+                isoutlet_restrict = True
+            elif data['or_key'] != site.itemsite_code:
+                isoutlet_restrict = False 
+
+        data['isoutlet_restrict'] = isoutlet_restrict
         return data
 
     class Meta:
@@ -2927,7 +2997,7 @@ class CustomerPlusSerializer(serializers.ModelSerializer):
                   'prepaid_card','cust_occupation', 'creditnote','voucher_available','oustanding_payment','cust_refer',
                   'custallowsendsms','cust_maillist','cust_title','cust_sexes','cust_class','cust_corporate',
                   'referredby_id','cust_referby_code','cust_nationality','cust_race','cust_marital',
-                  'is_pregnant','estimated_deliverydate','no_of_weeks_pregnant','no_of_children']
+                  'is_pregnant','estimated_deliverydate','no_of_weeks_pregnant','no_of_children','or_key']
         read_only_fields = ('cust_isactive','Site_Code','cust_code')
         extra_kwargs = {'cust_name': {'required': True},'cust_phone2': {'required': False},}
 
@@ -3192,6 +3262,18 @@ class TempcustsignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tempcustsign
         fields = ['id','cust_code','transaction_no','cust_sig','site_code','cart_id']  
+
+    def to_representation(self, obj):
+        request = self.context['request']
+        data = super(TempcustsignSerializer, self).to_representation(obj)
+        
+        ip = str(SITE_ROOT)
+        file = ""
+        if obj.cust_sig:
+            file = ip+str(obj.cust_sig)
+
+        data['cust_sig'] = file
+        return data    
 
 class CustomerDocumentSerializer(serializers.ModelSerializer):
 
@@ -3503,7 +3585,7 @@ class DisplayItemStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = Stock
         fields = ['id','item_name','item_desc','item_div','item_type',
-        'Stock_PIC','item_price','prepaid_value','redeempoints','item_code']
+        'Stock_PIC','item_price','prepaid_value','redeempoints','item_code','is_open_prepaid']
     
     def to_representation(self, instance):
         request = self.context['request']
@@ -3523,6 +3605,7 @@ class DisplayItemStockSerializer(serializers.ModelSerializer):
             data['item_price'] = "{:.2f}".format(float(instance.item_price)) 
         data['prepaid_value'] = "{:.2f}".format(float(instance.prepaid_value)) if instance.prepaid_value else "0.00"
         data['redeempoints'] = int(instance.redeempoints) if instance.redeempoints else ""
+        data['is_open_prepaid'] = True if instance.is_open_prepaid == True else False
         
         if instance.item_div == "1":
             stock = instance
@@ -3538,6 +3621,8 @@ class DisplayItemStockSerializer(serializers.ModelSerializer):
 
                     batch = ItemBatch.objects.filter(item_code=stock.item_code,site_code=site.itemsite_code,
                     uom=itemuom.uom_code).order_by('-pk').last()
+                    batchso_ids = ItemBatchSno.objects.filter(item_code__icontains=stock.item_code,
+                    availability=True,site_code=site.itemsite_code).order_by('pk').first()
 
                     uom = {
                             "itemuomprice_id": int(i.id),
@@ -3546,7 +3631,8 @@ class DisplayItemStockSerializer(serializers.ModelSerializer):
                             "item_price": "{:.2f}".format(float(i.item_price)),
                             "itemuom_id": itemuom_id, 
                             "itemuom_desc" : itemuom_desc,
-                            "onhand_qty": int(batch.qty) if batch else 0
+                            "onhand_qty": int(batch.qty) if batch else 0,
+                            "serial_no": batchso_ids.batch_sno if batchso_ids and batchso_ids.batch_sno else ""
                             }
                     uomlst.append(uom)
             
@@ -3576,5 +3662,42 @@ class OutletRequestLogSerializer(serializers.ModelSerializer):
         data['cust_phone'] = cust_phone        
         return data 
 
+class PrepaidOpenConditionSerializer(serializers.ModelSerializer):
+    # id = serializers.IntegerField(source='pk',required=False)
+    op_id = serializers.SerializerMethodField() 
+ 
+    def get_op_id(self, obj):
+        if obj.pk:
+            return obj.pk
+        else:
+            return None 
+
+    class Meta:
+        model = PrepaidOpenCondition
+        fields = ['op_id','p_itemtype','item_code','conditiontype1','conditiontype2','prepaid_value',
+        'prepaid_sell_amt','prepaid_valid_period','rate','membercardnoaccess','creditvalueshared',
+        'itemcart','itemdept_id','itembrand_id']
+
+    def to_representation(self, instance):
+        data = super(PrepaidOpenConditionSerializer, self).to_representation(instance)
+       
+
+        data['prepaid_value'] = "{:.2f}".format(float(instance.prepaid_value)) if instance.prepaid_value else "0.00" 
+        data['prepaid_sell_amt'] = "{:.2f}".format(float(instance.prepaid_sell_amt)) if instance.prepaid_sell_amt else "0.00"               
+        return data 
     
-            
+    
+class PrepaidValidperiodSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='pk',required=False)
+    prepaid_valid_days = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = PrepaidValidperiod
+        fields = ['id','prepaid_valid_code','prepaid_valid_desc','prepaid_valid_days',
+        'prepaid_valid_isactive']  
+
+class ScheduleMonthSerializer(serializers.ModelSerializer):
+   
+    class Meta:
+        model = ScheduleMonth
+        fields = '__all__'                    

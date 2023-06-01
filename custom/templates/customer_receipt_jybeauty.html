@@ -111,17 +111,6 @@ fix {
 body{
   padding: 20px;
 }
-#leftdiv {
-  height: 40px;
-  width: 68%;
-  float: left;
-}
-
-#rightdiv {
-    height: 40px;
-    width: 38%;
-    float: right;
-}
 </style>
 </head>
 {% load static %}
@@ -129,35 +118,7 @@ body{
 
   
   <div class="container-fluid">
-    <div id="leftdiv">
-			<div>
-				<img src="{{path}}" width="85" height="85" alt="">
-      </div>
-      <div style="font-size: 12px;">
-        <h5>{{name}}</h5>
-        <p>{{address}}</p>
-      </div>
-    </div>
-   
-    <div id="rightdiv">
-      {% if hdr.sa_transacno_type == "Receipt" %}
-        <h5>TAX INVOICE</h5>
-      {% elif hdr.sa_transacno_type == "Redeem Service" %}  
-        <h5>Render Service Receipt</h5>
-      {% elif hdr.sa_transacno_type == "Non Sales" %}  
-        <h5>Non Sales</h5> 
-      {% elif hdr.sa_transacno_type == "Void Transaction" %}  
-        <h5>Void Transaction</h5>  
-      {% else %}
-        <h5></h5> 
-      {% endif %} 
-     
-      <p style="font-size: 15px;line-height: 6px">Service Balance - {{ treatment_qty }} qty - ${{ treatment_bal|floatformat:2 }}</p>  
-      <p style="font-size: 15px;line-height: 6px">Prepaid Balance - {{ prepaid_qty }} qty - ${{ prepaid_bal|floatformat:2 }}</p> 
-      <p style="font-size: 15px;line-height: 6px">Total Outstanding - ${{ tot_outstanding|floatformat:2 }}</p>   
-    </div>  
-
-    <!-- <div class="container">
+    <div class="container">
       <div class="row  spaDetails" style="float: left;">
         <div class="col-xs-4 d-flex">
           <img src="{{path}}" width="55" height="55" alt="">
@@ -168,8 +129,20 @@ body{
           <p>{{address}}</p>
         </div>
       </div>
-     
-    </div> -->
+      <div class="row  spaDetails" style="float: right;">
+        {% if hdr.sa_transacno_type == "Receipt" %}
+          <h5>TAX INVOICE</h5>
+        {% elif hdr.sa_transacno_type == "Redeem Service" %}  
+          <h5>Service Redeem</h5>
+        {% elif hdr.sa_transacno_type == "Non Sales" %}  
+          <h5>Non Sales</h5> 
+        {% elif hdr.sa_transacno_type == "Void Transaction" %}  
+          <h5>Void Transaction</h5>  
+        {% else %}
+          <h5></h5> 
+        {% endif %}    
+      </div>  
+    </div>
    
   
 
@@ -184,7 +157,7 @@ body{
       </div>
     </div> -->
 
-    <div class="clearfix mt-5" style="padding-top: 10%">
+    <!-- <div class="clearfix mt-5">
       <div class="box">
         <div class="split" style="font-size: 15px;line-height: 10px">
           <br>
@@ -198,13 +171,44 @@ body{
               {% endif %}
             </p>
           {% endif %} 
-          <p><b>Cust Refer:</b>
-          {% if hdr.sa_custnoid.cust_refer %}
-          {{ hdr.sa_custnoid.cust_refer }} 
+          <p><b>Member:</b>
+          {% if hdr.sa_custnoid.Cust_Classid.class_desc %}
+          {{ hdr.sa_custnoid.Cust_Classid.class_desc }} 
           {% endif %}
           </p>
         </div>
         <div class="split right" style="font-size: 15px;line-height: 10px">
+          <br>
+          <br>
+          <p><b>Trans #: </b> {{ hdr.sa_transacno_ref }} </p>
+          <p><b>Date: </b>   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ date }} </p>
+          <p><b>Time: </b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ time }} </p>
+          <p><b>Issued: </b> &nbsp;&nbsp;{{ hdr.cas_name }} </p>
+        </div>
+      </div>
+    </div> -->
+
+    <div class="clearfix mt-5">
+      <div class="box">
+        <div class="split" style="font-size: 16px;line-height: 10px">
+          <br>
+          <br>
+          <p><b>Code:</b> {{ hdr.sa_custno }} </p>
+          <p><b>Name:</b> {{ hdr.sa_custname }} </p>
+          {% if site.is_nric %}
+            <p> <b>Nric:</b> 
+              {% if hdr.sa_custnoid.cust_nric %} 
+              {{ hdr.sa_custnoid.cust_nric }} 
+              {% endif %}
+            </p>
+          {% endif %} 
+          <p><b>Member:</b>
+          {% if hdr.sa_custnoid.Cust_Classid.class_desc %}
+            {{ hdr.sa_custnoid.Cust_Classid.class_desc }} 
+          {% endif %}
+          </p>
+        </div>
+        <div class="split right" style="font-size: 16px;line-height: 10px; text-align: right; margin-right: 40px;">
           <br>
           <br>
           <p><b>Trans #: </b> {{ hdr.sa_transacno_ref }} </p>
@@ -219,7 +223,7 @@ body{
 
 
     <table cellspacing="15" cellpadding="10" style="font-size: 15px;" >
-      <tr>
+      <tr style="line-height: 10px;">
         <th>No</th>
         <th>Description</th>
         <th>Qty</th>
@@ -235,65 +239,43 @@ body{
           <td>{{ forloop.counter }}</td>
   
             {% if d.isfoc and d.holditemqty is None %}
-              <td style="text-align: left;width: 40%;">{{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} $ &nbsp;{{ d.dt_price|floatformat:2 }}</td>
             {% elif d.dt_status == "SA" and d.record_detail_type == "PACKAGE" %}
-              <td style="text-align: left;width: 40%">{{ d.dt_itemdesc }} &#8209; {{ packages }}</td>  
+              <td class="text-left">{{ d.dt_itemdesc }} {{ packages }} ${{ d.dt_price|floatformat:2 }}</td>  
             {% elif d.dt_status == "SA" and d.record_detail_type == "TD" %}
-              <td style="text-align: left;width: 40%">{{ d.record_detail_type }} &#8209; {{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% elif d.dt_status == "SA" and d.record_detail_type == 'TP SERVICE' or d.record_detail_type == 'TP PRODUCT' or d.record_detail_type == 'TP PREPAID' %}
-              <td style="text-align: left;width: 40%">{{ d.record_detail_type }} &#8209; {{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% elif d.dt_status == "VT" %}
-              <td style="text-align: left;width: 40%">{{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% elif d.dt_status == "VT" and d.record_detail_type == "TD"%}
-              <td style="text-align: left;width: 40%">{{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% elif d.dt_status == "VT" and d.record_detail_type == 'TP SERVICE' or d.record_detail_type == 'TP PRODUCT' or d.record_detail_type == 'TP PREPAID' %}
-              <td style="text-align: left;width: 40%">{{ d.dt_itemdesc }}</td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% elif d.holditemqty is not None and d.record_detail_type == 'PRODUCT'%}
-              <td style="text-align: left;width: 40%">{{ d.record_detail_type }} &#8209;{{ d.dt_itemdesc|add:"(H"}}{{ d.holditemqty|floatformat:"0"|add:")"}}
-                {% if discreason and d.dt_discdesc %}
-                  Discount Reason : {{ d.dt_discdesc }} ,
-                {% endif %}
-                {% if discper  %}
-                  {% if d.dt_discpercent  %}
-                    Discount % : {{ d.dt_discpercent|floatformat:2 }} %
-                  {% elif d.dt_discamt  %} 
-                    Discount $ : {{ d.dt_discamt|floatformat:2 }} $
-                  {% endif %}  
-                {% endif %}
-              </td>
+              <td class="text-left">{{ d.dt_itemdesc|add:"(H"}}{{ d.holditemqty|floatformat:"0"|add:")"}} ${{ d.dt_price|floatformat:2 }}</td>
             {% else %}
-              <td style="text-align: left;width: 40%">{{ d.record_detail_type }} &#8209; {{ d.dt_itemdesc }}
-                {% if discreason and d.dt_discdesc %}
-                  Discount Reason : {{ d.dt_discdesc }}
-                {% endif %}
-                {% if discper  %}
-                  {% if d.dt_discpercent  %}
-                    Discount % : {{ d.dt_discpercent|floatformat:2 }} %
-                  {% elif d.dt_discamt  %} 
-                    Discount $ : {{ d.dt_discamt|floatformat:2 }} $
-                  {% endif %}  
-                {% endif %}
-              </td>
+              <td class="text-left">{{ d.dt_itemdesc }} ${{ d.dt_price|floatformat:2 }}</td>
             {% endif %}
   
             <td>&nbsp;{{ d.dt_qty }}</td>
             {% if d.dt_status == "SA" and d.record_detail_type == "TD" %}
               <td>&nbsp;</td>
             {% else %}
-              <td class="text-right">$&nbsp;{{ d.dt_amt|floatformat:2 }}</td>
+              <td class="text-right">{{ d.dt_amt|floatformat:2 }}</td>
             {% endif %}
             <!-- <td style="font-weight: normal;font-size: 13px;border: 1px solid grey;">$&nbsp;{{ d.dt_discamt|floatformat:2 }}</td> -->
             {% if d.dt_status == "SA" and d.record_detail_type == "TD" %}
               <td>&nbsp;</td>
             {% else %}
-              <td class="text-right">$&nbsp;{{ d.dt_deposit|floatformat:2 }}</td>
+              <td class="text-right">{{ d.dt_deposit|floatformat:2 }}</td>
             {% endif %}
   
             <!-- <li>13 - 17 = {{ 13|sub:17 }}</li> -->
             {% if d.dt_status == "SA" and d.record_detail_type == "TD" %}
               <td>&nbsp;</td>
             {% else %}
-              <td class="text-right">$&nbsp;{{ d.dt_amt|sub:d.dt_deposit |floatformat:2 }}</td>
+              <td class="text-right">{{ d.dt_amt|sub:d.dt_deposit |floatformat:2 }}</td>
             {% endif %}
   
            
@@ -312,24 +294,24 @@ body{
 
           </tr>
         {% endfor %}
-      <tr>
+      <tr style="line-height: 2px;">
         <th></th>
-        <th></th>
+        <th class="text-right">{{ tot_dt_price|floatformat:2 }}</th>
         <th>{{ total_qty }}</th>
         {% if d.dt_status == "SA" and d.record_detail_type == "TD" %}
-          <th>$&nbsp;{{ "0.00" }}</th>
-          <th>$&nbsp;{{ "0.00" }}</th>
-          <th>$&nbsp;{{ "0.00" }}</th>
+          <th>{{ "0.00" }}</th>
+          <th>{{ "0.00" }}</th>
+          <th>{{ "0.00" }}</th>
         {% else %}
-          <th class="text-right">$&nbsp;{{ trans_amt|floatformat:2 }}</th>
-          <th class="text-right">$&nbsp;{{ deposit_amt|floatformat:2 }}</th>
-          <th class="text-right">$&nbsp;{{ total_balance|floatformat:2 }}</th>
+          <th class="text-right">{{ trans_amt|floatformat:2 }}</th>
+          <th class="text-right">{{ deposit_amt|floatformat:2 }}</th>
+          <th class="text-right">{{ total_balance|floatformat:2 }}</th>
         {% endif %}
         <th></th>
         <th></th>
       </tr>
   
-      <tr>
+      <!-- <tr>
         <td></td>
         <td></td>
         <td></td>
@@ -341,11 +323,11 @@ body{
         {% else %}
           <td><span style="font-weight:bold"></span>$ {{ subtotal|floatformat:2 }}</td>
         {% endif %}
-      </tr>
+      </tr> -->
       </table>
 
-      <div class="split">
-        <div class="box">
+      <!-- <div  style="padding-top: 5%" class="justify-content-end">
+        <div>
         <th></th>
         <table style="border-collapse: collapse;" cellspacing="2" cellpadding="5" width="20%">
           <tr>
@@ -368,9 +350,45 @@ body{
           </tr>
         </table>
         </div>
+      </div> -->
+
+      <div class="row" style="padding-top: 5%">
+        <div class="col-6"></div>
+        <div class="col-6">
+          <table style="border-collapse: collapse;" cellspacing="2" cellpadding="5" width="20%">
+            <tr style="border-bottom: 1px solid black;">
+              <td><b>No</b></td>
+              <td><b>Type</b></td>
+              <td><b>Amount</b></td>
+            </tr>
+            {% for taud in postaud %}
+              <tr>
+                <td>{% if taud.pay_rem1 %} {{ taud.pay_rem1 }} {% else %} {% endif %}</td>
+                <td>{{ taud.pay_typeid.pay_description }}</td>
+                <td class="text-right">${{ taud.pay_amt|floatformat:2 }}</td>
+              </tr>
+            {% endfor %}
+    
+            <tr style="border-top: 1px solid black;">
+              <td>GST {{ percent }}&nbsp;%  {{ hdr.sa_totgst|floatformat:2 }}</td>
+              <td>Total</td>
+              <td class="text-right">{{ billing_amount|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>Tender Amount</td>
+              <td class="text-right">{{ billing_amount|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>Change Amount</td>
+              <td class="text-right">{{ "0.00" }}</td>
+            </tr>
+          </table>
+        </div>
       </div>
 
-      <div class="split right1">
+      <!-- <div class="split right1">
         {% if hdr.sa_totgst %}
           <h6>Gst: {{ hdr.sa_totgst|floatformat:2 }}</h6>
         {% else %}
@@ -383,92 +401,91 @@ body{
           <h6>Rounding: {{ "0.00" }}</h6>
         {% endif %}
         <h6>Grand Total: {{ billing_amount|floatformat:2 }}</h6>
-      </div>
+      </div> -->
       
      <br/>
      
-     <div class="box" style="padding-top: 30%">
-      
-      <div class="split" style="font-size: 15px;line-height: 10px">
-        <td style="text-align: left;font-size: 15px;float: left;"><h5>Remarks:</h5>  <td>
-        {% if treatmentbal %}  
-        <div class="row">
-          <table style="width: 80%;text-align: center">
-            <tr>
-              <td style="text-align: left;"><u><b>Bal</b></u></td>
-              <td style="text-align: left;"><u><b>Treatment Desc</b></u></td>
-            </tr>
-    
-            {% for t in treatment %}
-              <tr style="line-height: 14px">
-                <td style="text-align: left;">{{ t.total }}</td>
-                <td style="text-align: left;">{{ t.course }}</td>
-              </tr>
-            {% endfor %}
-    
-          </table>
-        </div>
-      {% endif %}
+      <div style="padding-top: 30%">
 
-      <br/>
-      {% if showprepaid %}
-          <div class="row">
-            <table style="width: 80%;text-align: center">
-              <tr>
-                <td style="text-align: left;"><u><b>Bal</b></u></td>
-                <td style="text-align: left;"><u><b>Prepaid Desc</b></u></td>
-              </tr>
-      
-              {% for p in prepaid_lst %}
-                <tr style="line-height: 14px">
-                  <td style="text-align: left;">{{ p.remain }}</td>
-                  <td style="text-align: left;">{{ p.pp_desc }}</td>
-                </tr>
-              {% endfor %}
-      
-            </table>
-          </div>
-      {% endif %}
-
-      <br/>
-      {% if showcredit %}  
-          <div class="row">
-            <table style="width: 80%;text-align: center">
-              <tr>
-                <td style="text-align: left;"><u><b>Bal</b></u></td>
-                <td style="text-align: left;"><u><b>CreditNote</b></u></td>
-              </tr>
-      
-              {% for ce in creditlst %}
-                <tr style="line-height: 14px">
-                  <td style="text-align: left;">{{ ce.balance }}</td>
-                  <td style="text-align: left;">{{ ce.creditnote_no }}</td>
-                </tr>
-              {% endfor %}
-      
-            </table>
-          </div>
-      {% endif %}
-      <br/>
-      {% if showvoidreason %}
-        <tr>
-          <p>Void Reason:  <td style="font-size: 12px;">{% if hdr.trans_remark %} {{ hdr.trans_remark }}  {% else %} {% endif %}</td></p>
-        </tr>
-
-      {% endif %}
-      </div>
-      <div class="split right" style="font-size: 15px;line-height: 10px">
         <div style="display: flex;justify-content: flex-end;" >
           <div>
             {% if custsign_ids %}
               <img src="{{custsign_ids}}" width="85" height="85" alt="" style="padding-left: 30px;padding-bottom:20px;"> 
             {% endif %}
-            <p style="border-top: 1px dashed black;padding-top:10px;"><b>Customer Signature</b></p> 
+              <p style="border-top: 1px dashed black;padding-top:10px;">Customer Signature</p> 
             </div>
         </div>
-        <div style="min-height: 5px;">
 
-          
+        {% if showprepaid %}
+          <div class="row">
+            <table style="width: 40%;border: 1px solid black;text-align: center">
+              <tr>
+                <th style="border: 1px solid black;">Prepaid Desc</th>
+                <th style="border: 1px solid black;">Balance</th>
+              </tr>
+      
+              {% for p in prepaid_lst %}
+                <tr>
+                  <td>{{ p.pp_desc }}</td>
+                  <td>{{ p.remain }}</td>
+                </tr>
+              {% endfor %}
+      
+            </table>
+          </div>
+       {% endif %}
+
+       <br/>
+        {% if treatmentbal %}  
+          <div class="row">
+            <table style="width: 40%;border: 1px solid black;text-align: center">
+              <tr>
+                <th style="border: 1px solid black;">Treatment Desc</th>
+                <th style="border: 1px solid black;">Balance</th>
+              </tr>
+      
+              {% for t in treatment %}
+                <tr>
+                  <td>{{ t.course }}</td>
+                  <td>{{ t.total }}</td>
+                </tr>
+              {% endfor %}
+      
+            </table>
+          </div>
+        {% endif %}
+        <br/>
+        {% if showcredit %}  
+          <div class="row">
+            <table style="width: 40%;border: 1px solid black;text-align: center">
+              <tr>
+                <th style="border: 1px solid black;">CreditNote</th>
+                <th style="border: 1px solid black;">Balance</th>
+              </tr>
+      
+              {% for ce in creditlst %}
+                <tr>
+                  <td>{{ ce.creditnote_no }}</td>
+                  <td>{{ ce.balance }}</td>
+                </tr>
+              {% endfor %}
+      
+            </table>
+          </div>
+        {% endif %}
+
+        {% if showvoidreason %}
+          <tr>
+            <p>Void Reason:  <td style="font-size: 12px;">{% if hdr.trans_remark %} {{ hdr.trans_remark }}  {% else %} {% endif %}</td></p>
+          </tr>
+
+        {% endif %}
+        <tr>
+          <p>Remarks:  </p>
+        </tr>
+     
+  
+        <div style="min-height: 5px;">
           {% for taud in postaud %}
             <tr>
               <p style="font-size: 14px;"> {% if taud.pay_rem4 %} {{ taud.pay_rem4 }} {% else %} {% endif %} </p>
@@ -482,11 +499,12 @@ body{
           <p style="font-size: 14px;">{% if footer5 %} {{ footer5 }} {% else %} {% endif %}</p>
           <p style="font-size: 14px;">{% if footer6 %} {{ footer6 }} {% else %} {% endif %}</p>
         </div>
+
+        
+
+       
   
       </div>
-    </div>
-
-     
 
     
 	</div>

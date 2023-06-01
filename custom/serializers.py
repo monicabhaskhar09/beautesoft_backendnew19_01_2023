@@ -9,8 +9,9 @@ WorkOrderInvoiceDetailModel,WorkOrderInvoiceAddrModel,WorkOrderInvoiceItemModel,
 DeliveryOrderDetailModel,DeliveryOrderItemModel,DeliveryOrdersign,EquipmentDropdownModel,EquipmentUsage,
 EquipmentUsageItemModel,Currencytable,QuotationPayment,ManualInvoicePayment,quotationsign,RoundSales,ManualInvoicesign)
 from cl_table.models import (Treatment, Stock, PackageDtl, ItemClass, ItemRange, Employee, Tmptreatment,
-TmpItemHelper,PosHaud,City, State, Country, Stock,Title,PayGroup,ItemDept )
-from cl_table.serializers import get_client_ip
+TmpItemHelper,PosHaud,City, State, Country, Stock,Title,PayGroup,ItemDept,Systemsetup,PrepaidOpenCondition,
+PrepaidValidperiod,VoucherCondition,ItemBrand)
+from cl_table.serializers import get_client_ip,PrepaidOpenConditionSerializer
 from django.db.models import Sum
 from datetime import date, timedelta, datetime
 import datetime
@@ -192,14 +193,14 @@ class VoucherRecordSerializer(serializers.ModelSerializer):
 
     sitecode_name = serializers.CharField(source='site_codeid.itemsite_desc',required=False)
     cust_name = serializers.CharField(source='cust_codeid.cust_name',required=False)
-    sa_date = serializers.DateTimeField(format="%d-%m-%Y",required=False)
+    # sa_date = serializers.DateTimeField(format="%d-%m-%Y",required=False)
 
 
     class Meta:
         model = VoucherRecord
         fields = ['id','voucher_no','cust_codeid','cust_name',
         'value','percent','site_codeid','sitecode_name',
-        'issued_expiry_date','isvalid','voucher_name','sa_date','issued_staff']
+        'issued_expiry_date','isvalid','voucher_name','sa_date','issued_staff','sa_transacno']
                  
 class VoucherRecordAccSerializer(serializers.ModelSerializer):
 
@@ -296,11 +297,13 @@ class ExchangeProductSerializer(serializers.Serializer):
 class SmtpSettingsSerializer(serializers.ModelSerializer):
 
     sitecode = serializers.CharField(source='site_codeid.itemsite_code',required=False)
+    site_codeid = serializers.CharField(source='site_codeid.itemsite_desc',required=False)
 
     class Meta:
         model = SmtpSettings
         fields = ['id','sender_name','sender_address','smtp_serverhost','port','user_email','user_password',
-        'email_use_ssl','email_use_tls','email_subject','email_content','sms_content','site_codeid','sitecode']
+        'email_use_ssl','email_use_tls','email_subject','email_content','sms_content','site_codeid','sitecode',
+        'isactive']
 
    
 
@@ -495,7 +498,19 @@ class CartServiceCourseSerializer(serializers.ModelSerializer):
 
     def to_representation(self, obj):
        
-        tmpids = Tmptreatment.objects.filter(itemcart=obj).order_by('pk')
+        tmpids = Tmptreatment.objects.filter(itemcart=obj).order_by('-pk')
+        auto_proportion = False
+        if not tmpids:
+            courseautopro_setup = Systemsetup.objects.filter(title='courseautoproportion',
+            value_name='courseautoproportion',isactive=True).first()
+            auto_proportion = True if courseautopro_setup and courseautopro_setup.value_data == 'True' else False
+        else:
+            audotrt_ids = tmpids.filter(trmt_is_auto_proportion=True)
+            if audotrt_ids:
+                auto_proportion = True
+
+       
+        
         
         data = [{'slno': i,'program': c.course,'next_appt': datetime.datetime.strptime(str(c.next_appt), "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y") ,'unit_amount': "{:.2f}".format(c.unit_amount)} 
         for i, c in enumerate(tmpids, start=1)]
@@ -539,13 +554,15 @@ class CartServiceCourseSerializer(serializers.ModelSerializer):
 
         treatment_limit_times = obj.treatment_limit_times
         if not obj.treatment_limit_times:
-            if obj.itemcodeid.treatment_limit_active == True:
-                treatment_limit_times = obj.itemcodeid.treatment_limit_count
+            if obj.itemcodeid and obj.itemcodeid.limitservice_flexionly == True:
+                treatment_limit_times = obj.itemcodeid.treatment_limit_count 
 
         treat_type = obj.treat_type
         if not obj.treat_type:
             if (obj.itemcodeid.flexipoints and obj.itemcodeid.flexipoints > 0 or obj.itemcodeid.limitservice_flexionly == True):
                 treat_type = "FFi"
+
+
 
 
         mapped_object = {
@@ -555,6 +572,7 @@ class CartServiceCourseSerializer(serializers.ModelSerializer):
             'price': "{:.2f}".format(float(obj.price)),
             'total_price' : "{:.2f}".format(float(obj.total_price)),
             'discount_price' : "{:.2f}".format(float(obj.discount_price)),
+            # 'dis_price_withoutround' : obj.discount_price,
             'trans_amt' : "{:.2f}".format(float(obj.trans_amt)),
             'deposit' : "{:.2f}".format(float(obj.deposit)),
             'treatment_no': obj.treatment_no,
@@ -573,7 +591,8 @@ class CartServiceCourseSerializer(serializers.ModelSerializer):
             'treat_expiry': treat_expiry,
             'treat_type': treat_type,
             'flexipoint': int(obj.itemcodeid.flexipoints) if obj.itemcodeid.flexipoints else None,
-            'treatment_limit_times': treatment_limit_times
+            'treatment_limit_times': treatment_limit_times,
+            'auto_proportion': auto_proportion
             }
        
         return mapped_object
@@ -622,6 +641,42 @@ class CourseTmpSerializer(serializers.ModelSerializer):
         fields = ['id','cart_id','treatment_no','free_sessions','total_price','disc_amount',
         'disc_percent','unit_price','auto_propation']
 
+class VoucherConditionSerializer(serializers.ModelSerializer):
+    # id = serializers.IntegerField(source='pk',required=False)
+    op_id = serializers.SerializerMethodField() 
+ 
+    def get_op_id(self, obj):
+        return None 
+
+    class Meta:
+        model = VoucherCondition
+        fields = ['op_id','p_itemtype','item_code','conditiontype1','conditiontype2',
+        'rate']
+
+    def to_representation(self, instance):
+        data = super(VoucherConditionSerializer, self).to_representation(instance)
+       
+        data['prepaid_valid_period'] = None
+        data['membercardnoaccess'] = False
+        data['creditvalueshared'] = False
+        data['itemcart'] = None
+        data['prepaid_value'] = "{:.2f}".format(float(instance.amount)) if instance.amount else "0.00" 
+        data['prepaid_sell_amt'] = "{:.2f}".format(float(instance.amount)) if instance.amount else "0.00"               
+        itemdept_id = None ; itembrand_id = None 
+        if instance.conditiontype2 != 'All':
+            itemdept_obj = ItemDept.objects.filter(itm_desc__icontains=instance.conditiontype2,
+            is_service=True, itm_status=True).order_by('itm_seq').first()
+            if itemdept_obj:
+                itemdept_id = itemdept_obj.pk
+
+            itembrand_obj = ItemBrand.objects.filter(itm_desc__icontains=instance.conditiontype2,
+            retail_product_brand=True, itm_status=True).order_by('itm_seq').first()
+            if itembrand_obj:
+                itembrand_id = itembrand_obj.pk
+
+        data['itemdept_id'] = itemdept_id  
+        data['itembrand_id'] = itembrand_id    
+        return data 
 
 class CartPrepaidSerializer(serializers.ModelSerializer): 
 
@@ -632,11 +687,36 @@ class CartPrepaidSerializer(serializers.ModelSerializer):
 
 
     def to_representation(self, obj):
+        request = self.context['request']
         # print(obj.prepaid_value,"obj.prepaid_value")
         if obj.prepaid_value == None:
             prepaid_value = "{:.2f}".format(float(obj.itemcodeid.prepaid_value)),
         else:
             prepaid_value = "{:.2f}".format(obj.prepaid_value),
+
+        pqueryset = PrepaidOpenCondition.objects.filter(itemcart=obj,
+            item_code=obj.itemcodeid.item_code).order_by('id')
+        serializer = PrepaidOpenConditionSerializer(pqueryset, context={'request': request}, many=True)       
+       
+        if not pqueryset:       
+            vo_ids = VoucherCondition.objects.filter(item_code=obj.itemcodeid.item_code,isactive=True).order_by('pk') 
+            if vo_ids:
+                serializer = VoucherConditionSerializer(vo_ids, context={'request': request}, many=True) 
+
+        
+        # isopen_prepaid = obj.isopen_prepaid 
+        # if not obj.isopen_prepaid:
+        #     isopen_prepaid = True if obj.itemcodeid.is_open_prepaid == True else False
+        # else:
+        #     isopen_prepaid = True if obj.isopen_prepaid == True else False
+        
+        prepaid_valid_period = ""
+        if pqueryset and pqueryset[0].prepaid_valid_period:
+            prepaid_valid_period = pqueryset[0].prepaid_valid_period
+        else:
+            default_ids = PrepaidValidperiod.objects.filter(prepaid_valid_isactive=True).order_by('prepaid_valid_days')
+            if default_ids and default_ids[0].prepaid_valid_days:
+                prepaid_valid_period = default_ids[0].prepaid_valid_days
 
         # print(prepaid_value,"prepaid_value")   
         mapped_object = {
@@ -647,7 +727,10 @@ class CartPrepaidSerializer(serializers.ModelSerializer):
             'trans_amt' : "{:.2f}".format(float(obj.trans_amt)),
             'deposit' : "{:.2f}".format(float(obj.deposit)),
             'prepaid_value' : prepaid_value[0],
-            'isopen_prepaid' : obj.isopen_prepaid,
+            'isopen_prepaid' : True if obj.itemcodeid.is_open_prepaid == True else False,
+            'openprepaid_condition': serializer.data,
+            'prepaid_valid_period' :  prepaid_valid_period,
+            'membercardnoaccess' : pqueryset[0].membercardnoaccess if pqueryset and pqueryset[0].membercardnoaccess else False
             }
        
         return mapped_object

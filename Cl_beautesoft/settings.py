@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'custom',
     'clpayroll',
     'cl_ipad',
+    'cl_reports',
 ]
 
 MIDDLEWARE = [
@@ -129,14 +130,46 @@ WSGI_APPLICATION = 'Cl_beautesoft.wsgi.application'
 
 #microsoft sql local server
 # healspahq_backup9
+# Local Database Connection
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'sql_server.pyodbc',
+#         'NAME': 'jybeauty',
+#         'HOST': 'localhost',
+#         'PORT': '1433',
+#         'USER': 'sa',
+#         'PASSWORD': 'Bhass$095',
+#         'OPTIONS': {
+#             'driver': 'ODBC Driver 17 for SQL Server',
+#         }
+#     }
+# }
+
+# Staging Database Connection
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'sql_server.pyodbc',
+#         'NAME': 'esthetic',
+#         'HOST': '103.253.14.235',
+#         'PORT': '8890',
+#         'USER': 'monica',
+#         'PASSWORD': 'bigtree',
+#         'OPTIONS': {
+#             'driver': 'ODBC Driver 17 for SQL Server',
+#         }
+#     }
+# }
+
 DATABASES = {
     'default': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'jybeauty',
-        'HOST': 'localhost',
-        'PORT': '1433',
-        'USER': 'sa',
-        'PASSWORD': 'Bhass$095',
+        'HOST': '103.253.14.219',
+        'PORT': '8890',
+        'USER': 'monica',
+        'PASSWORD': 'monica@Doodle',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
         }
