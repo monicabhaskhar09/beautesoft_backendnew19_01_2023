@@ -99,6 +99,7 @@ from django.contrib.auth import authenticate, login , logout, get_user_model
 from itertools import chain 
 from fpdf import FPDF 
 from cl_app.serializers import TransactionManualInvoiceSerializer
+from Cl_beautesoft.calculation import two_decimal_digit
 
 type_ex = ['VT-Deposit','VT-Top Up','VT-Sales']
 
@@ -1382,8 +1383,8 @@ def create_tdstaff(cart,empobj,stock_obj,site):
 
     tmpp_treatids = Tmptreatment.objects.filter(itemcart=cart).order_by('pk')[0]
     if tmpp_treatids:
-        amount = float(tmpp_treatids.unit_amount)
-        deposit = float(cart.deposit)
+        amount = two_decimal_digit(tmpp_treatids.unit_amount)
+        deposit = two_decimal_digit(cart.deposit)
 
         if amount > float(deposit):
             system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -4415,8 +4416,9 @@ class itemCartViewset(viewsets.ModelViewSet):
                             # print(cart.multi_treat.all(),"kkk")    
                             
                             treat_remark = cart.multi_treat.filter(~Q(remarks__isnull=True)).first()
-                            cart.remark = treat_remark.remarks
-                            cart.save()
+                            if treat_remark:
+                                cart.remark = treat_remark.remarks
+                                cart.save()
 
                             if req['ori_stockid']:
                                 cart.exchange_id = ex
@@ -7244,11 +7246,11 @@ class ExchangeProductConfirmAPIView(generics.CreateAPIView):
                         #     multi.save()
                             # print(multi.id,"multi")
                         
-                        mdeposit = float(c.deposit) / float(c.multistaff_ids.all().count()) 
                         for sale in c.multistaff_ids.all():
+                            mdeposit = (float(c.deposit)/100) * float(sale.ratio) 
                             multi = Multistaff(sa_transacno=sa_transacno,item_code=str(c.itemcodeid.item_code)+"0000",
                             emp_code=sale.emp_code,ratio=sale.ratio,salesamt="{:.2f}".format(float(sale.salesamt)),type=None,isdelete=False,role=1,
-                            dt_lineno=c.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)))
+                            dt_lineno=c.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)),gt1deposit=0)
                             multi.save()    
 
                         if int(c.itemcodeid.Item_Divid.itm_code) == 1 and c.itemcodeid.Item_Divid.itm_desc == 'RETAIL PRODUCT' and c.itemcodeid.Item_Divid.itm_isactive == True:
@@ -7522,11 +7524,11 @@ class ExchangeProductConfirmAPIView(generics.CreateAPIView):
                         #     multi.save()
                             # print(multi.id,"multi")
                         
-                        mdeposit = float(c.deposit) / float(c.multistaff_ids.all().count()) 
                         for sale in c.multistaff_ids.all():
+                            mdeposit = (float(c.deposit)/100) * float(sale.ratio) 
                             multi = Multistaff(sa_transacno=sa_transacno,item_code=str(c.itemcodeid.item_code)+"0000",
                             emp_code=sale.emp_code,ratio=sale.ratio,salesamt="{:.2f}".format(float(sale.salesamt)),type=None,isdelete=False,role=1,
-                            dt_lineno=c.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)))
+                            dt_lineno=c.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)),gt1deposit=0)
                             multi.save()     
 
                         if int(c.itemcodeid.Item_Divid.itm_code) == 1 and c.itemcodeid.Item_Divid.itm_desc == 'RETAIL PRODUCT' and c.itemcodeid.Item_Divid.itm_isactive == True:
@@ -8071,6 +8073,19 @@ class ChangeStaffViewset(viewsets.ModelViewSet):
                     Multistaff.objects.filter(sa_transacno=sa_transacno).delete()
                     ItemHelper.objects.filter(helper_transacno=sa_transacno).delete()
 
+                    gt1_ids = Paytable.objects.filter(gt_group='GT1',pay_isactive=True).order_by('-pk') 
+                    gt1_lst = list(set([i.pay_code for i in gt1_ids if i.pay_code]))
+                    # print(gt1_lst,"gt1_lst")
+                    taud_gt1ids = PosTaud.objects.filter(sa_transacno=sa_transacno,
+                    pay_type__in=gt1_lst).order_by('pk').aggregate(pay_amt=Coalesce(Sum('pay_amt'), 0))
+                    # print(taud_gt1ids,"taud_gt1ids")
+                    posdaud_ids = PosDaud.objects.filter(sa_transacno=sa_transacno)
+                    cart_deposit = sum([i.dt_deposit for i in posdaud_ids])
+                    taud_gt1_deposit = 0
+                    if taud_gt1ids and taud_gt1ids['pay_amt'] > 0.0:
+                        taud_gt1_deposit = taud_gt1ids['pay_amt']
+
+
                     for idx, req in enumerate(request.data, start=1):
                         itemcart = ItemCart.objects.filter(id=req['id']).first()
                     
@@ -8149,13 +8164,38 @@ class ChangeStaffViewset(viewsets.ModelViewSet):
                                     itemcart.multistaff_ids.add(tm) 
                                     itemcart.sales_staff.add(emp_obj.pk) 
                             
-                            mdeposit = float(itemcart.deposit) / float(itemcart.multistaff_ids.all().count()) 
+                            
+                            line_gt1amount = 0
+                            if taud_gt1_deposit > 0:
+                                gt1_percent = (taud_gt1_deposit / cart_deposit) * 100
+                                line_gt1amount = (float(itemcart.deposit)/100) * gt1_percent
+
+                            # print(line_gt1amount,"line_gt1amount")    
+                            tot_mdeposit = 0 ; tot_gt1deposit = 0
+
                             for sale in itemcart.multistaff_ids.all():
+                                m_deposit = (float(itemcart.deposit)/100) * float(sale.ratio) 
+                                mdeposit = two_decimal_digit(m_deposit)
+                                # print(mdeposit,"mdeposit")
+                                tot_mdeposit += mdeposit
+                                if line_gt1amount > 0:
+                                    mgt1_deposit = (float(line_gt1amount)/100) * float(sale.ratio) 
+                                    mgt1deposit = two_decimal_digit(mgt1_deposit)
+                                    tot_gt1deposit += mgt1deposit
+                                else:
+                                    mgt1deposit = 0
+
                                 multi = Multistaff(sa_transacno=sa_transacno,item_code=str(itemcart.itemcodeid.item_code)+"0000",
                                 emp_code=sale.emp_code,ratio=sale.ratio,salesamt="{:.2f}".format(float(sale.salesamt)),type=None,isdelete=False,role=1,
-                                dt_lineno=itemcart.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)))
+                                dt_lineno=itemcart.lineno,salescommpoints=sale.salescommpoints,deposit=mdeposit,gt1deposit=mgt1deposit)
                                 multi.save()
-
+                            
+                            bal_mdeposit = float(itemcart.deposit) - tot_mdeposit
+                            multi.deposit = "{:.2f}".format(float(multi.deposit + bal_mdeposit))
+                            if line_gt1amount > 0:
+                                bal_mgt1deposit = float(line_gt1amount) - tot_gt1deposit
+                                multi.gt1deposit = "{:.2f}".format(float(multi.gt1deposit + bal_mgt1deposit))
+                            multi.save()
                             
                             for existing in itemcart.helper_ids.all():
                                 itemcart.helper_ids.remove(existing) 
@@ -8377,7 +8417,7 @@ class ChangeStaffViewset(viewsets.ModelViewSet):
                             #     tmp_ids = TmpItemHelper.objects.filter(treatment=itemcart.treatment).order_by('pk').update(workcommpoints=value)
                 
 
-                        elif itemcart.type in ['Deposit','Top Up','Exchange'] and int(itemcart.itemcodeid.item_div) != 3:
+                        elif (itemcart.type in ['Deposit','Top Up','Exchange'] and int(itemcart.itemcodeid.item_div) != 3) or (itemcart.type in ['Top Up'] and int(itemcart.itemcodeid.item_div) == 3):
                             for i, sa in enumerate(req['data'], start=1):
                                 # print(sa,"depp")
                                 emp_obj = Employee.objects.filter(emp_isactive=True,pk=sa['emp_id']).first()
@@ -8420,13 +8460,38 @@ class ChangeStaffViewset(viewsets.ModelViewSet):
                                 if emp_obj:
                                     itemcart.multistaff_ids.add(tm) 
                                     itemcart.sales_staff.add(emp_obj.pk) 
+
+                            line_gt1amount = 0
+                            if taud_gt1_deposit > 0:
+                                gt1_percent = (taud_gt1_deposit / cart_deposit) * 100
+                                line_gt1amount = (float(itemcart.deposit)/100) * gt1_percent
+
+                            # print(line_gt1amount,"line_gt1amount")    
+                            tot_mdeposit = 0 ; tot_gt1deposit = 0        
                             
-                            mdeposit = float(itemcart.deposit) / float(itemcart.multistaff_ids.all().count()) 
                             for sale in itemcart.multistaff_ids.all():
+                                m_deposit = (float(itemcart.deposit)/100) * float(sale.ratio) 
+                                mdeposit = two_decimal_digit(m_deposit)
+                                # print(mdeposit,"mdeposit")
+                                tot_mdeposit += mdeposit
+                                if line_gt1amount > 0:
+                                    mgt1_deposit = (float(line_gt1amount)/100) * float(sale.ratio) 
+                                    mgt1deposit = two_decimal_digit(mgt1_deposit)
+                                    tot_gt1deposit += mgt1deposit
+                                else:
+                                    mgt1deposit = 0
+
                                 multi = Multistaff(sa_transacno=sa_transacno,item_code=str(itemcart.itemcodeid.item_code)+"0000",
                                 emp_code=sale.emp_code,ratio=sale.ratio,salesamt="{:.2f}".format(float(sale.salesamt)),type=None,isdelete=False,role=1,
-                                dt_lineno=itemcart.lineno,salescommpoints=sale.salescommpoints,deposit="{:.2f}".format(float(mdeposit)))
+                                dt_lineno=itemcart.lineno,salescommpoints=sale.salescommpoints,deposit=mdeposit,gt1deposit=mgt1deposit)
                                 multi.save()
+
+                            bal_mdeposit = float(itemcart.deposit) - tot_mdeposit
+                            multi.deposit = "{:.2f}".format(float(multi.deposit + bal_mdeposit))
+                            if line_gt1amount > 0:
+                                bal_mgt1deposit = float(line_gt1amount) - tot_gt1deposit
+                                multi.gt1deposit = "{:.2f}".format(float(multi.gt1deposit + bal_mgt1deposit))
+                            multi.save()    
                             
                             sales = "";service=""
                             if itemcart.sales_staff.all():
@@ -8709,6 +8774,7 @@ class CartPopupViewset(viewsets.ModelViewSet):
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Sent Valid Cart ID",'error': True} 
                         return Response(result, status=status.HTTP_400_BAD_REQUEST) 
 
+                    tsales_amount = 0; tsales_percentage = 0 
                     for s in req['data']:
                         if s['work'] == True:
                             if s['work_percentage'] == "":
@@ -8725,6 +8791,18 @@ class CartPopupViewset(viewsets.ModelViewSet):
                                 raise Exception('Sales Amount Should not be empty') 
                             if s['sp'] == "":
                                 raise Exception('sp Should not be empty') 
+                            tsales_amount += float(s['sales_amount'])
+                            tsales_percentage += float(s['sales_percentage'])
+
+                    # print(tsales_percentage,"tsales_percentage")
+                    if itemcart.type != 'Sales':
+                        if tsales_percentage < float(itemcart.ratio) or tsales_percentage > float(itemcart.ratio):
+                            m_sg = "Sales Percentage sum should be equal to Cart Ratio {0} % cart item {1} & lineno {2} .".format(str(float(itemcart.ratio)),str(itemcart.itemdesc),str(itemcart.lineno))
+                            raise Exception(m_sg) 
+
+                        if tsales_amount < float(itemcart.trans_amt) or tsales_amount > float(itemcart.trans_amt):
+                            mt_sg = "Sales Amount sum should be equal to Cart Transac Amt $ {0} cart item {1} & lineno {2} .".format(str(float(itemcart.trans_amt)),str(itemcart.itemdesc),str(itemcart.lineno))
+                            raise Exception(mt_sg)     
 
 
                     if itemcart.type == 'Deposit' and int(itemcart.itemcodeid.item_div) == 3:
@@ -10089,7 +10167,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
             if not cart_obj:
                 raise Exception("Please Give Valid Cart ID")
 
-            deposit = float(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
+            deposit = two_decimal_digit(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
             if not deposit:
                 raise Exception("Please Give Cart Deposit")
 
@@ -10120,7 +10198,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
                 return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
             
 
-            amount = sum([i.unit_amount for i in tmp_treatids])
+            amount = two_decimal_digit(float(sum([i.unit_amount for i in tmp_treatids])))
               
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -10225,7 +10303,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
             if not cart_obj:
                 raise Exception("Please Give Valid Cart ID")
 
-            deposit = float(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
+            deposit = two_decimal_digit(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
             if not deposit:
                 raise Exception("Please Give Cart Deposit")
 
@@ -10246,7 +10324,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
                 if done > int(qty):
                     raise Exception("Item Cart Done Session Should not be greater than Cart quantity!!")
 
-            amount = sum([i.unit_amount for i in tmp_treatids])
+            amount = two_decimal_digit(float(sum([i.unit_amount for i in tmp_treatids])))
 
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -10598,7 +10676,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
             if not cart_obj:
                 raise Exception("Please Give Valid Cart ID")
 
-            deposit = float(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
+            deposit = two_decimal_digit(request.GET.get('deposit',None)) if request.GET.get('deposit',None) else None
             if not deposit:
                 raise Exception("Please Give Valid Deposit")
 
@@ -10620,7 +10698,7 @@ class CourseTmpItemHelperViewset(viewsets.ModelViewSet):
                 if done > int(qty):
                     raise Exception("Item Cart Done Session Should not be greater than Cart quantity!!")
 
-            amount = sum([i.unit_amount for i in tmp_treatids])
+            amount = two_decimal_digit(float(sum([i.unit_amount for i in tmp_treatids])))
 
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -10911,7 +10989,7 @@ class PackageServiceTmpItemHelperViewset(viewsets.ModelViewSet):
             
 
             trasac = posobj.price * posobj.qty
-            deposit = posobj.deposit_amt
+            deposit = two_decimal_digit(posobj.deposit_amt)
 
             qty = posobj.qty
             if qty:
@@ -10919,7 +10997,7 @@ class PackageServiceTmpItemHelperViewset(viewsets.ModelViewSet):
                     raise Exception("Done Session Should not be greater than Package Details quantity!!")
 
 
-            amount = float(trasac / qty)
+            amount = two_decimal_digit(trasac / qty)
               
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -11005,11 +11083,11 @@ class PackageServiceTmpItemHelperViewset(viewsets.ModelViewSet):
                 raise Exception("Item Cart ID does not exist")
 
             trasac = posobj.price * posobj.qty
-            deposit = float(posobj.deposit_amt)
+            deposit = two_decimal_digit(posobj.deposit_amt)
 
             qty = posobj.qty
 
-            amount = float(trasac / qty)
+            amount = two_decimal_digit(trasac / qty)
 
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -11346,12 +11424,12 @@ class PackageServiceTmpItemHelperViewset(viewsets.ModelViewSet):
                 raise Exception("Item Cart ID does not exist")
 
             trasac = posobj.price * posobj.qty
-            deposit =  float(posobj.deposit_amt)
+            deposit =  two_decimal_digit(posobj.deposit_amt)
 
 
             qty = posobj.qty
 
-            amount = float(trasac / qty)
+            amount = two_decimal_digit(trasac / qty)
 
             if amount > float(deposit):
                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
@@ -11656,12 +11734,13 @@ class ChangePaymentDateViewset(viewsets.ModelViewSet):
                 # if preacc_ids:
                 #     PrepaidAccountCondition.objects.filter(pp_no=sa_transacno,pk__in=list(preacc_ids)).update(updated_at=pay_date,created_at=pay_date)
                 
-                for k in preacc_ids:
-                    kobj = PrepaidAccountCondition.objects.filter(pp_no=sa_transacno,pk=k).first()
-                    if kobj:
-                        kobj.updated_at = pay_date
-                        kobj.created_at = pay_time
-                        kobj.save()
+                if preacc_ids:
+                    for k in preacc_ids:
+                        kobj = PrepaidAccountCondition.objects.filter(pp_no=sa_transacno,pk=k).first()
+                        if kobj:
+                            kobj.updated_at = pay_date
+                            kobj.created_at = pay_time
+                            kobj.save()
 
 
                 voucher_ids = VoucherRecord.objects.filter(sa_transacno=sa_transacno).values_list('pk', flat=True).distinct()
@@ -12006,8 +12085,8 @@ class AddRemoveSalesStaffViewset(viewsets.ModelViewSet):
 
                                         tmpp_treatids = Tmptreatment.objects.filter(itemcart=cartobj).order_by('pk')[0]
                                         if tmpp_treatids:
-                                            amount = float(tmpp_treatids.unit_amount)
-                                            deposit = float(cartobj.deposit)
+                                            amount = two_decimal_digit(tmpp_treatids.unit_amount)
+                                            deposit = two_decimal_digit(cartobj.deposit)
 
                                             if amount > float(deposit):
                                                 system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()

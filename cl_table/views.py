@@ -6214,7 +6214,7 @@ class TreatmentApptAPI(generics.ListAPIView):
             site = fmspw[0].loginsite
             cust_id = self.request.GET.get('cust_id',None)
             now = timezone.now()
-            print(str(now.hour) + '  ' +  str(now.minute) + '  ' +  str(now.second),"Start hour, minute, second\n")
+            # print(str(now.hour) + '  ' +  str(now.minute) + '  ' +  str(now.second),"Start hour, minute, second\n")
             cust_obj = Customer.objects.filter(pk=cust_id,
             cust_isactive=True).first()
             if cust_obj is None:
@@ -6223,12 +6223,12 @@ class TreatmentApptAPI(generics.ListAPIView):
 
             tre_queryset = TreatmentPackage.objects.filter(cust_code=cust_obj.cust_code,
             open_session__gt=0).order_by('-pk')
-            print(tre_queryset,"tre_queryset")
+            # print(tre_queryset,"tre_queryset")
 
             # #prepaid account 
             pre_queryset = PrepaidAccount.objects.filter(cust_code=cust_obj.cust_code,
             status=True,remain__gt=0).only('site_code','cust_code','sa_status').order_by('-pk')
-            print(pre_queryset,"pre_queryset") 
+            # print(pre_queryset,"pre_queryset") 
             system_setup = Systemsetup.objects.filter(title='ApptPackagePrepaidBalanceList',
             value_name='ApptPackagePrepaidBalanceList',isactive=True).first()
             
@@ -6239,7 +6239,7 @@ class TreatmentApptAPI(generics.ListAPIView):
             # print(combined_ids,"combined_ids")
 
             
-            full_tot = combined_ids.count()
+            full_tot = len(combined_ids)
             try:
                 limit = int(request.GET.get("limit",12))
             except:
@@ -6329,6 +6329,15 @@ class TreatmentApptAPI(generics.ListAPIView):
                 else:
                     last_acc_ids = PrepaidAccount.objects.filter(pp_no=row.pp_no,
                     status=True,line_no=row.line_no).order_by('pk').last()
+                    purchase_date = ""
+                    oriacc_ids = PrepaidAccount.objects.filter(pp_no=row.pp_no,
+                    sa_status='DEPOSIT',line_no=row.line_no).only('pp_no','site_code','sa_status','line_no').first()
+                    if oriacc_ids:
+                        if oriacc_ids.sa_date:
+                            #purchase date
+                            splt_st = str(oriacc_ids.sa_date).split(" ")
+                            purchase_date = datetime.datetime.strptime(str(splt_st[0]), "%Y-%m-%d").strftime("%d-%m-%Y")
+   
 
                     if last_acc_ids:
                         pexpiry = ""
@@ -6340,15 +6349,15 @@ class TreatmentApptAPI(generics.ListAPIView):
                         'price': "{:.2f}".format(float(last_acc_ids.pp_total)),'expiry': pexpiry,
                         'balance': "{:.2f}".format(float(last_acc_ids.remain)) if last_acc_ids.remain else "0.00",
                         'outstanding': "{:.2f}".format(float(last_acc_ids.outstanding)) if last_acc_ids.outstanding else "0.00",
-                        'type':'prepaid'}
+                        'type':'prepaid','purchase_date': purchase_date}
 
                         data_list.append(pre)
             
             if data_list != []:
                 now1 = timezone.now()
-                print(str(now1.hour) + '  ' +  str(now1.minute) + '  ' +  str(now1.second),"End hour, minute, second\n")
+                # print(str(now1.hour) + '  ' +  str(now1.minute) + '  ' +  str(now1.second),"End hour, minute, second\n")
                 totalh = now1.second - now.second
-                print(totalh,"total")
+                # print(totalh,"total")
                 result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
                 'data': {'meta': {'pagination': {"per_page":limit,"current_page":page,"total":full_tot,
                 "total_pages":total_page}}, 'dataList': data_list},
@@ -8615,31 +8624,7 @@ class postaudViewset(viewsets.ModelViewSet):
 
 
                 
-                # haudre = PosHaud.objects.filter(ItemSite_Codeid__pk=site.pk).order_by('sa_transacno')
-                # haudre = PosTaud.objects.filter(ItemSIte_Codeid__pk=site.pk).values('sa_transacno').distinct().order_by('-pk','-sa_transacno')[:2]
-                # print(haudre,"haudre")
-                # final = list(set([r['sa_transacno'] for r in haudre]))
-                # print(final,len(final),"final")
-                # saprefix = control_obj.control_prefix
-
-                # lst = []
-                # if final != []:
-                #     for f in final:
-                #        newstr = f.replace(saprefix,"")
-                #        new_str = newstr.replace(code_site, "")
-                #        lst.append(new_str)
-                #        lst.sort(reverse=True)
-
-                #     # print(lst,"lst")
-                #     sa_no = int(lst[0]) + 1
-                #     # sa_no = int(lst[0][-6:]) + 1
-                #     sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(sa_no)
-                # else:
-                #     sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
-
-                sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
-                control_obj.control_no = int(control_obj.control_no) + 1
-                control_obj.save()   
+               
                 
                 
                 depotop_ids = cart_ids.filter(type__in=['Deposit','Top Up'])
@@ -8716,6 +8701,10 @@ class postaudViewset(viewsets.ModelViewSet):
                             if float(r['pay_amt']) > float(pacids.remain):
                                 result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
                                 return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+                        if not 'cartuse_ids' in r or not r['cartuse_ids']:  
+                            raise Exception("Prepaid payload cartuse_ids key is not present!!") 
+
 
                     # elif 'points' in r and r['points'] == True: 
                     #     if not 'cur_value' in r or not r['cur_value'] or float(r['cur_value']) <= 0:
@@ -8833,7 +8822,33 @@ class postaudViewset(viewsets.ModelViewSet):
                 # if poshaud_ids:
                 #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"PosHaud Already Created!!",'error': True} 
                 #     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+                
+                # haudre = PosHaud.objects.filter(ItemSite_Codeid__pk=site.pk).order_by('sa_transacno')
+                # haudre = PosTaud.objects.filter(ItemSIte_Codeid__pk=site.pk).values('sa_transacno').distinct().order_by('-pk','-sa_transacno')[:2]
+                # print(haudre,"haudre")
+                # final = list(set([r['sa_transacno'] for r in haudre]))
+                # print(final,len(final),"final")
+                # saprefix = control_obj.control_prefix
 
+                # lst = []
+                # if final != []:
+                #     for f in final:
+                #        newstr = f.replace(saprefix,"")
+                #        new_str = newstr.replace(code_site, "")
+                #        lst.append(new_str)
+                #        lst.sort(reverse=True)
+
+                #     # print(lst,"lst")
+                #     sa_no = int(lst[0]) + 1
+                #     # sa_no = int(lst[0][-6:]) + 1
+                #     sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(sa_no)
+                # else:
+                #     sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
+
+                sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
+                control_obj.control_no = int(control_obj.control_no) + 1
+                control_obj.save() 
+                  
                 sa_count = 1
 
                 while sa_count > 0:
@@ -9103,7 +9118,7 @@ class postaudViewset(viewsets.ModelViewSet):
                                                     checkamt = check_amt
                                                     # print(checkamt,"checkamt 111")
                                                     
-                                                    if i.pk in req['cartuse_ids']:
+                                                    if 'cartuse_ids' in req and i.pk in req['cartuse_ids']:
                                                         p_pac_ids = PrepaidAccount.objects.filter(pp_no=pp_no,line_no=line_no,
                                                         cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
                                                         
@@ -9132,7 +9147,9 @@ class postaudViewset(viewsets.ModelViewSet):
                                                         voucher_no=pac_ids.voucher_no,isvoucher=pac_ids.isvoucher,has_deposit=pac_ids.has_deposit,topup_amt=0,
                                                         outstanding=pac_ids.outstanding if pac_ids and pac_ids.outstanding is not None and pac_ids.outstanding > 0 else 0,active_deposit_bonus=pac_ids.active_deposit_bonus,topup_no="",topup_date=None,
                                                         line_no=pac_ids.line_no,staff_name=None,staff_no=None,
-                                                        pp_type2=open_ids.conditiontype2,condition_type1=open_ids.conditiontype1,pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
+                                                        pp_type2=open_ids.conditiontype2 if open_ids and open_ids.conditiontype2 else "",
+                                                        condition_type1=open_ids.conditiontype1 if open_ids and open_ids.conditiontype1 else "",
+                                                        pos_daud_lineno=pac_ids.line_no,Cust_Codeid=cust_obj,Site_Codeid=site,
                                                         Item_Codeid=p_pac_ids.Item_Codeid,item_code=p_pac_ids.item_code)
                                                         prepacc.save()
                                                         prepacc.sa_date = pay_date 
@@ -9542,14 +9559,22 @@ class postaudViewset(viewsets.ModelViewSet):
                 #detail creation
                 id_lst = [] ; totQty = 0; discount_amt=0.0;additional_discountamt=0.0; total_disc = 0.0
                 outstanding_new = 0.0
+                
+                gt1_ids = Paytable.objects.filter(gt_group='GT1',pay_isactive=True).order_by('-pk') 
+                gt1_lst = list(set([i.pay_code for i in gt1_ids if i.pay_code]))
+                # print(gt1_lst,"gt1_lst")
+                taud_gt1ids = PosTaud.objects.filter(sa_transacno=sa_transacno,
+                pay_type__in=gt1_lst).order_by('pk').aggregate(pay_amt=Coalesce(Sum('pay_amt'), 0))
+                # print(taud_gt1ids,"taud_gt1ids")
+                cart_deposit = sum([i.deposit for i in cart_ids])
 
                 if depo_ids:
-                    depo = invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding, pay_date, pay_time)
+                    depo = invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding, pay_date, pay_time,taud_gt1ids,cart_deposit)
                     for dep in depo:
                         if dep not in id_lst:
                             id_lst.append(dep) 
                 if topup_ids:
-                    topup = invoice_topup(self, request, topup_ids, sa_transacno, cust_obj, outstanding , pay_date, pay_time)
+                    topup = invoice_topup(self, request, topup_ids, sa_transacno, cust_obj, outstanding , pay_date, pay_time,taud_gt1ids,cart_deposit)
                     for toup in topup:
                         if toup not in id_lst:
                             id_lst.append(toup) 
@@ -9561,11 +9586,11 @@ class postaudViewset(viewsets.ModelViewSet):
                             id_lst.append(sal) 
 
                 if exchange_ids:
-                    exproduct = invoice_exchange(self, request, exchange_ids, sa_transacno, cust_obj, outstanding , pay_date, pay_time)
+                    exproduct = invoice_exchange(self, request, exchange_ids, sa_transacno, cust_obj, outstanding , pay_date, pay_time,taud_gt1ids,cart_deposit)
                     for ex in exproduct:
                         if ex not in id_lst:
                             id_lst.append(ex) 
-
+                            
                 # if cart_ids.filter(type='Deposit').order_by('lineno').first():
                 #     alsales_staff = cart_ids.filter(type='Deposit').order_by('lineno').first().sales_staff.all().first()
                 # else:
@@ -9577,9 +9602,7 @@ class postaudViewset(viewsets.ModelViewSet):
                 totQty = int(sumqty['quantity__sum'])
                 ex_cart_ids = cart_ids.exclude(type='Exchange')
                 total_disc = sum([ca.discount_amt + ca.additional_discountamt for ca in ex_cart_ids if ca.discount_amt and ca.additional_discountamt])
-                gt1_ids = Paytable.objects.filter(gt_group='GT1',pay_isactive=True).order_by('-pk') 
-                gt1_lst = list(set([i.pay_code for i in gt1_ids if i.pay_code]))
-                # print(gt1_lst,"gt1_lst")
+               
 
                 if depotop_ids:
                     #header creation
@@ -9874,9 +9897,9 @@ class postaudViewset(viewsets.ModelViewSet):
                                 cdt.save()
 
 
-                taud_gt1ids = PosTaud.objects.filter(sa_transacno=sa_transacno,itemsite_code=site.itemsite_code,
-                pay_type__in=gt1_lst).order_by('pk').aggregate(pay_amt=Coalesce(Sum('pay_amt'), 0))
-                # print(taud_gt1ids,"taud_gt1ids")
+                # taud_gt1ids = PosTaud.objects.filter(sa_transacno=sa_transacno,itemsite_code=site.itemsite_code,
+                # pay_type__in=gt1_lst).order_by('pk').aggregate(pay_amt=Coalesce(Sum('pay_amt'), 0))
+                # # print(taud_gt1ids,"taud_gt1ids")
                 if taud_gt1ids and taud_gt1ids['pay_amt'] > 0.0:
                     mgm_ids = MGMPolicyCloud.objects.filter(site_ids__pk=site.pk,
                     minimum_purchase_amt__gte=0,point_value__gt=0,no_of_reward_times__gte=0).order_by('level') 
@@ -11450,9 +11473,10 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                     d['dt_itemdesc'] = d['dt_itemdesc'] +" "+"Discount Reason : "+ str(d_obj.dt_discdesc)
 
                 if discper == True and d_obj.dt_discpercent:
-                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount % : "+ str(int(d_obj.dt_discpercent)) +"%"
+                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount % : "+ str("{:.2f}".format(d_obj.dt_discpercent)) +"%"
                 elif discper == True and d_obj.dt_discamt:
-                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount $ : "+ str(int(d_obj.dt_discamt)) +"$"
+                    dt_discpercent_val = (100 / d_obj.dt_price) * d_obj.dt_discamt
+                    d['dt_itemdesc'] = d['dt_itemdesc'] +" "+", Discount % : "+ str("{:.2f}".format(dt_discpercent_val)) +"%"
 
 
 
@@ -13571,7 +13595,7 @@ class CustApptAPI(generics.ListAPIView):
         
         if self.request.GET.get('customeroutletrestrict',None) == '1':
             if asystem_setup and asystem_setup.value_data == 'True':
-                queryset = Customer.objects.filter(cust_isactive=True).filter(~Q(or_key=site.itemsite_code),~Q(or_key__isnull=True)).only('cust_isactive').order_by('-pk')
+                queryset = Customer.objects.filter(cust_isactive=True).filter(~Q(or_key=site.itemsite_code)).only('cust_isactive').order_by('-pk')
             else:
                 queryset = Customer.objects.objects.none()
             
@@ -21867,10 +21891,10 @@ class StripeCustomerCreateAPIView(GenericAPIView):
                     # if ex_ids:
                     #     ex_ids.stripe_id = customer.id
                     #     ex_ids.save()
+
                     if cust_obj:
                         cust_obj.stripe_id = customer.id
-                        cust_obj.save()
-    
+                        cust_obj.save()    
 
                 else:
                     customer = customer_data[0]

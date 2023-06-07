@@ -85,6 +85,7 @@ from django.db.models import Case, When, Value, IntegerField,CharField, DateFiel
 from django.contrib.auth import authenticate, login , logout, get_user_model
 import json
 from cl_table.services import create_multiuom_transac,multiuom_adjsafter_stockopenup
+from Cl_beautesoft.calculation import two_decimal_digit
 
 
 type_ex = ['VT-Deposit','VT-Top Up','VT-Sales']
@@ -4059,16 +4060,19 @@ class TrmtTmpItemHelperViewset(viewsets.ModelViewSet):
                 acc_ids = TreatmentAccount.objects.filter(ref_transacno=t_ids[0].sa_transacno,
                 treatment_parentcode=t_ids[0].treatment_parentcode).order_by('-sa_date','-sa_time','-id').first()
                 trids = t_ids.aggregate(amount=Coalesce(Sum('unit_amount'), 0))
+                # print(trids,"trids")
                 if acc_ids and acc_ids.balance:
                     # acc_balance = float("{:.2f}".format(acc_ids.balance))
-                    acc_balance = acc_ids.balance
+                    acc_balance = two_decimal_digit(acc_ids.balance)
                 else:
                     acc_balance = 0
 
                 if trids['amount'] and float(trids['amount']) > 0:
                     # tr_unitamt = float("{:.2f}".format(trids['amount']))
-                    tr_unitamt = trids['amount']
-                    if acc_balance < tr_unitamt:
+                    tr_unitamt = two_decimal_digit(trids['amount'])
+                    # print(tr_unitamt,"tr_unitamt")
+                    # print(acc_balance,"acc_balance")
+                    if acc_balance + 0.02 < tr_unitamt:
                         system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
                         if system_setup:
                             result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Insufficient Amount in Treatment Account, Please Top Up!!",'error': True} 
@@ -4299,14 +4303,14 @@ class TrmtTmpItemHelperViewset(viewsets.ModelViewSet):
                     trids = t_ids.aggregate(amount=Coalesce(Sum('unit_amount'), 0))
                     if acc_ids and acc_ids.balance:
                         # acc_balance = float("{:.2f}".format(acc_ids.balance))
-                        acc_balance = acc_ids.balance
+                        acc_balance = two_decimal_digit(acc_ids.balance)
                     else:
                         acc_balance = 0
                         
                     if trids['amount'] and trids['amount'] > 0:
                         # tr_unitamt = float("{:.2f}".format(trids['amount']))
-                        tr_unitamt = trids['amount']
-                        if acc_balance < tr_unitamt:
+                        tr_unitamt = two_decimal_digit(trids['amount'])
+                        if acc_balance + 0.02 < tr_unitamt:
                             system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
                             if system_setup: 
                                 msg = "Treatment Account Balance is S{0} is not enough to TD ${1}, Please Topup".format(str("{:.2f}".format(acc_ids.balance)),str("{:.2f}".format(trids['amount'])))
@@ -4658,8 +4662,10 @@ class TrmtTmpItemHelperViewset(viewsets.ModelViewSet):
                     if not trmtobj:
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Treatment ID does not exist/Status Should be in Open only!!",'error': True} 
                         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
-                    trmtobj.remarks = request.GET.get('remarks',None)
-                    trmtobj.save()
+
+                    if request.GET.get('remarks',None):     
+                        trmtobj.remarks = request.GET.get('remarks',None)
+                        trmtobj.save()
 
                     helpr_ids = TmpItemHelper.objects.filter(treatment__pk__in=arrtreatmentid).delete()
                 
@@ -5087,14 +5093,14 @@ class TrmtTmpItemHelperViewsetOld(viewsets.ModelViewSet):
                 trids = t_ids.aggregate(amount=Coalesce(Sum('unit_amount'), 0))
                 if acc_ids and acc_ids.balance:
                     # acc_balance = float("{:.2f}".format(acc_ids.balance))
-                    acc_balance = acc_ids.balance
+                    acc_balance = two_decimal_digit(acc_ids.balance)
                 else:
                     acc_balance = 0
 
                 if trids['amount'] and float(trids['amount']) > 0:
                     # tr_unitamt = float("{:.2f}".format(trids['amount']))
-                    tr_unitamt = trids['amount']
-                    if acc_balance < tr_unitamt:
+                    tr_unitamt = two_decimal_digit(trids['amount'])
+                    if acc_balance + 0.02 < tr_unitamt:
                         system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
                         if system_setup:
                             result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Insufficient Amount in Treatment Account, Please Top Up!!",'error': True} 
@@ -5222,14 +5228,14 @@ class TrmtTmpItemHelperViewsetOld(viewsets.ModelViewSet):
                 trids = t_ids.aggregate(amount=Coalesce(Sum('unit_amount'), 0))
                 if acc_ids and acc_ids.balance:
                     # acc_balance = float("{:.2f}".format(acc_ids.balance))
-                    acc_balance = acc_ids.balance
+                    acc_balance = two_decimal_digit(acc_ids.balance)
                 else:
                     acc_balance = 0
                     
                 if trids['amount'] and trids['amount'] > 0:
                     # tr_unitamt = float("{:.2f}".format(trids['amount']))
-                    tr_unitamt = trids['amount']
-                    if acc_balance < tr_unitamt:
+                    tr_unitamt = two_decimal_digit(trids['amount'])
+                    if acc_balance + 0.02 < tr_unitamt:
                         system_setup = Systemsetup.objects.filter(title='Treatment',value_name='Allow layaway',value_data='FALSE',isactive=True).first()
                         if system_setup: 
                             msg = "Treatment Account Balance is S{0} is not enough to TD ${1}, Please Topup".format(str("{:.2f}".format(acc_ids.balance)),str("{:.2f}".format(trids['amount'])))
@@ -10899,19 +10905,20 @@ class PrepaidAccPaymentListViewset(viewsets.ModelViewSet):
                         # open_ids.conditiontype1 
                         # open_ids.conditiontype2
 
-                        data["conditiontype1"]= ','.join(list(set([v.conditiontype1 for v in in_open_ids if v.conditiontype1])))
-                        data["conditiontype2"]=  ','.join(list(set([v.conditiontype2 for v in in_open_ids if v.conditiontype2])))                            
+                        data["conditiontype1"]= ','.join(list(set([v.conditiontype1 for v in in_open_ids if v.conditiontype1]))) if in_open_ids else ""
+                        data["conditiontype2"]=  ','.join(list(set([v.conditiontype2 for v in in_open_ids if v.conditiontype2]))) if in_open_ids else ""                           
                         data["product"] = 0.00;data["service"] = 0.00;data["all"] = 0.00
-                        if open_ids.conditiontype1 == "Product Only":
-                            data["product"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            product_type += last_acc_ids.remain 
-                        elif open_ids.conditiontype1 == "Service Only":
-                            data["service"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            service_type += last_acc_ids.remain
-                        elif open_ids.conditiontype1 == "All":
-                            data["all"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            all_type += last_acc_ids.remain
-                        
+                        if open_ids:
+                            if open_ids.conditiontype1 == "Product Only":
+                                data["product"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                product_type += last_acc_ids.remain 
+                            elif open_ids.conditiontype1 == "Service Only":
+                                data["service"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                service_type += last_acc_ids.remain
+                            elif open_ids.conditiontype1 == "All":
+                                data["all"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                all_type += last_acc_ids.remain
+                            
                         #OP redeem_amount calculations
                         ol_open_ids = PrepaidAccountCondition.objects.filter(pp_no=preobj.pp_no,
                         pos_daud_lineno=preobj.line_no).order_by('pk')
@@ -11002,7 +11009,7 @@ class PrepaidAccPaymentListViewset(viewsets.ModelViewSet):
                                     # print(use_final_ids,"use_final_ids")
                                     use_amount_ids = use_final_ids.aggregate(deposit=Coalesce(Sum('deposit'), 0))   
                                     # print(use_amount_ids['deposit'],"kk")
-                                    if use_amount_ids['deposit']: 
+                                    if use_amount_ids and use_amount_ids['deposit']: 
                                         if last_acc_ids.remain >= use_amount_ids['deposit'] :
                                             data["redeem_amount"] = "{:.2f}".format(use_amount_ids['deposit'] )
                                         elif last_acc_ids.remain < use_amount_ids['deposit'] :
@@ -11245,18 +11252,19 @@ class PrepaidAccListViewset(viewsets.ModelViewSet):
 
                         open_ids = PrepaidAccountCondition.objects.filter(pp_no=preobj.pp_no,
                         pos_daud_lineno=preobj.line_no,p_itemtype="Inclusive").only('pp_no','pos_daud_lineno').first()
-                        data["conditiontype1"]=open_ids.conditiontype1               
+                        data["conditiontype1"]=open_ids.conditiontype1 if open_ids and open_ids.conditiontype1 else ""             
                         data["product"] = 0.00;data["service"] = 0.00;data["all"] = 0.00
-                        if open_ids.conditiontype1 == "Product Only":
-                            data["product"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            product_type += last_acc_ids.remain if last_acc_ids.status == True else 0
-                        elif open_ids.conditiontype1 == "Service Only":
-                            data["service"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            service_type += last_acc_ids.remain if last_acc_ids.status == True else 0
-                        elif open_ids.conditiontype1 == "All":
-                            data["all"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
-                            all_type += last_acc_ids.remain if last_acc_ids.status == True else 0
-        
+                        if open_ids:
+                            if open_ids.conditiontype1 == "Product Only":
+                                data["product"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                product_type += last_acc_ids.remain if last_acc_ids.status == True else 0
+                            elif open_ids.conditiontype1 == "Service Only":
+                                data["service"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                service_type += last_acc_ids.remain if last_acc_ids.status == True else 0
+                            elif open_ids.conditiontype1 == "All":
+                                data["all"] = "{:.2f}".format(float(last_acc_ids.pp_amt))
+                                all_type += last_acc_ids.remain if last_acc_ids.status == True else 0
+            
                         lst.append(data)
 
                 current_date = datetime.datetime.strptime(str(date.today()), "%Y-%m-%d").strftime("%d-%m-%Y")
@@ -11324,12 +11332,13 @@ class PrepaidAccListViewset(viewsets.ModelViewSet):
             open_ids = PrepaidAccountCondition.objects.filter(pp_no=account.pp_no,
             pos_daud_lineno=account.line_no,p_itemtype="Inclusive").only('pp_no','pos_daud_lineno').first()
             product_type = 0.00; service_type = 0.00; all_type = 0.00
-            if open_ids.conditiontype1 == "Product Only":
-                product_type += last_acc_ids.remain 
-            elif open_ids.conditiontype1 == "Service Only":
-                service_type += last_acc_ids.remain
-            elif open_ids.conditiontype1 == "All":
-                all_type += last_acc_ids.remain
+            if open_ids:
+                if open_ids.conditiontype1 == "Product Only":
+                    product_type += last_acc_ids.remain 
+                elif open_ids.conditiontype1 == "Service Only":
+                    service_type += last_acc_ids.remain
+                elif open_ids.conditiontype1 == "All":
+                    all_type += last_acc_ids.remain
 
             if queryset:
                 last = queryset.last()
