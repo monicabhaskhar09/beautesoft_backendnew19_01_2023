@@ -922,9 +922,9 @@ class Customer(models.Model):
     # cust_ctyid = models.FloatField(db_column='Cust_CTYID', blank=True, null=True)  # Field name made lowercase.
     # exp_status = models.BooleanField(db_column='Exp_Status',null=True)  # Field name made lowercase.
     # cust_expirydate = models.DateTimeField(db_column='Cust_ExpiryDate', blank=True, null=True)  # Field name made lowercase.
-    # cust_birthyear = models.FloatField(db_column='Cust_BirthYear', blank=True, null=True)  # Field name made lowercase.
-    # cust_birthmonth = models.FloatField(db_column='Cust_BirthMonth', blank=True, null=True)  # Field name made lowercase.
-    # cust_birthday = models.FloatField(db_column='Cust_BirthDay', blank=True, null=True)  # Field name made lowercase.
+    cust_birthyear = models.FloatField(db_column='Cust_BirthYear', blank=True, null=True)  # Field name made lowercase.
+    cust_birthmonth = models.FloatField(db_column='Cust_BirthMonth', blank=True, null=True)  # Field name made lowercase.
+    cust_birthday = models.FloatField(db_column='Cust_BirthDay', blank=True, null=True)  # Field name made lowercase.
     # cust_sex = models.CharField(db_column='Cust_Sex', max_length=255, blank=True, null=True)  # Field name made lowercase.
     cust_address = models.CharField(db_column='Cust_address', max_length=255, blank=True, null=True)  # Field name made lowercase.
     cust_address1 = models.CharField(db_column='Cust_address1', max_length=255, blank=True, null=True)  # Field name made lowercase.
@@ -1099,7 +1099,9 @@ class Customer(models.Model):
     no_of_weeks_pregnant = models.IntegerField(db_column='NoOfWeeksOfPregnancy', blank=True, null=True)  # Field name made lowercase.
     no_of_children = models.IntegerField(db_column='NoOfChildren', blank=True, null=True)  # Field name made lowercase.
     # customerextend = models.ForeignKey('cl_table.CustomerExtended', on_delete=models.PROTECT, null=True)
-  
+    custallowsendwhatsapp = models.BooleanField(db_column='custallowsendwhatsapp',default=False)
+
+
     def save(self, *args,**kwargs):
         if self.Cust_Classid:
             self.cust_class = self.Cust_Classid.class_code
@@ -1460,7 +1462,7 @@ class PrepaidAccount(models.Model):
     id = models.BigAutoField(db_column='ID',primary_key=True)  # Field name made lowercase.
     pp_no = models.CharField(db_column='PP_NO',  max_length=50, null=True)  # Field name made lowercase.
     pp_type = models.CharField(db_column='PP_TYPE', max_length=50, null=True)  # Field name made lowercase.
-    pp_desc = models.CharField(db_column='PP_DESC', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    pp_desc = models.CharField(db_column='PP_DESC', max_length=250, blank=True, null=True)  # Field name made lowercase.
     sa_date = models.DateTimeField(db_column='SA_DATE', blank=True, null=True,auto_now_add=True)  # Field name made lowercase.
     start_date = models.DateTimeField(db_column='START_DATE', blank=True, null=True,auto_now_add=True)  # Field name made lowercase.
     exp_date = models.DateTimeField(db_column='EXP_DATE', blank=True, null=True)  # Field name made lowercase.
@@ -1572,7 +1574,7 @@ class PrepaidAccountCondition(models.Model):
     id = models.AutoField(db_column='ID',primary_key=True)  # Field name made lowercase.
     pp_no = models.CharField(db_column='PP_NO',  max_length=50, null=True)  # Field name made lowercase.
     pp_type = models.CharField(db_column='PP_TYPE', max_length=50, null=True)  # Field name made lowercase.
-    pp_desc = models.CharField(db_column='PP_DESC', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    pp_desc = models.CharField(db_column='PP_DESC', max_length=250, blank=True, null=True)  # Field name made lowercase.
     p_itemtype = models.CharField(db_column='P_ItemType', max_length=50, null=True)  # Field name made lowercase.
     item_code = models.CharField(max_length=20, null=True)
     conditiontype1 = models.CharField(db_column='ConditionType1', max_length=80, null=True)  # Field name made lowercase.
@@ -4360,3 +4362,17 @@ class OutletRequestLog(models.Model):
    
     class Meta:
         db_table = 'Outlet_Request_Log'
+
+class invoicetemplate(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=200, blank=True, null=True)  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='isActive',default=True)  # Field name made lowercase.
+    checked = models.BooleanField(db_column='Checked',default=True)  # Field name made lowercase.
+    type = models.CharField(db_column='Type', max_length=200, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        db_table = 'invoicetemplate'
+        unique_together = (('name'),)
+
+
+

@@ -1097,6 +1097,7 @@ class Customer(models.Model):
     estimated_deliverydate = models.DateTimeField(db_column='EstimatedDeliveryDate', blank=True, null=True)  # Field name made lowercase.
     no_of_weeks_pregnant = models.IntegerField(db_column='NoOfWeeksOfPregnancy', blank=True, null=True)  # Field name made lowercase.
     no_of_children = models.IntegerField(db_column='NoOfChildren', blank=True, null=True)  # Field name made lowercase.
+    custallowsendwhatsapp = models.BooleanField(db_column='custallowsendwhatsapp',default=False)
 
     def save(self, *args,**kwargs):
         if self.Cust_Classid:
@@ -4176,3 +4177,15 @@ class OutletRequestLog(models.Model):
    
     class Meta:
         db_table = 'Outlet_Request_Log'
+
+
+class invoicetemplate(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=200, blank=True, null=True)  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='isActive',default=True)  # Field name made lowercase.
+    checked = models.BooleanField(db_column='Checked',default=True)  # Field name made lowercase.
+    type = models.CharField(db_column='Type', max_length=200, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        db_table = 'invoicetemplate'
+        unique_together = (('name'),)        

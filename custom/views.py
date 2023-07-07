@@ -45,7 +45,7 @@ TreatmentAccount, PosDaud, ItemDept, DepositAccount, PrepaidAccount, ItemDiv, Sy
 PackageHdr,PackageDtl,Paytable,Multistaff,ItemBatch,Stktrn,ItemUomprice,Holditemdetail,CreditNote,
 CustomerClass,ItemClass,Tmpmultistaff,Tmptreatment,ExchangeDtl,ItemUom,ItemHelper,PrepaidAccountCondition,
 City, State, Country, Stock,PayGroup,Tempcustsign,Item_MembershipPrice,TreatmentPackage,PrepaidOpenCondition,
-ItemBrand)
+ItemBrand,CustomerPoint)
 from cl_app.models import ItemSitelist, SiteGroup, TmpTreatmentSession,TmpItemHelperSession
 from cl_table.serializers import (PostaudSerializer,StaffsAvailableSerializer,PosdaudSerializer,TmpItemHelperSerializer,
 PrepaidOpenConditionSerializer)
@@ -1148,25 +1148,29 @@ class EmployeeCartAPI(viewsets.ModelViewSet):
                 result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give sales_staff in parms!!",'error': True} 
                 return Response(result, status=status.HTTP_400_BAD_REQUEST) 
 
-            if not self.request.user.is_authenticated:
-                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Unauthenticated Users are not allowed!!",'error': True} 
-                return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+            # if not self.request.user.is_authenticated:
+            #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Unauthenticated Users are not allowed!!",'error': True} 
+            #     return Response(result, status=status.HTTP_400_BAD_REQUEST) 
 
-            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
-            if not self.request.GET.get('sitecodeid',None) is None:
-                site = ItemSitelist.objects.filter(pk=self.request.GET.get('sitecodeid',None),itemsite_isactive=True).first()
-                if not site:
-                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Item Site ID does not exist!!",'error': True} 
-                    return Response(result, status=status.HTTP_400_BAD_REQUEST) 
-            else:
-                site = fmspw[0].loginsite
-            branch = ItemSitelist.objects.filter(pk=site.pk,itemsite_isactive=True).first() 
-            if not branch:
-                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Outlet Id does not exist!!",'error': True} 
-                return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+            # if not self.request.GET.get('sitecodeid',None) is None:
+            #     site = ItemSitelist.objects.filter(pk=self.request.GET.get('sitecodeid',None),itemsite_isactive=True).first()
+            #     if not site:
+            #         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Item Site ID does not exist!!",'error': True} 
+            #         return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+            # else:
+            site = fmspw.loginsite
 
-            emp_siteids = EmpSitelist.objects.filter(Site_Codeid__pk=branch.pk,isactive=True)
-            staffs = list(set([e.Emp_Codeid.pk for e in emp_siteids if e.Emp_Codeid and e.Emp_Codeid.emp_isactive == True]))
+            # branch = ItemSitelist.objects.filter(pk=site.pk,itemsite_isactive=True).first() 
+            # if not branch:
+            #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Outlet Id does not exist!!",'error': True} 
+            #     return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+            
+
+            emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,isactive=True,Emp_Codeid__emp_isactive=True).values_list('Emp_Codeid', flat=True).distinct()))
+
+            # staffs = list(set([e.Emp_Codeid.pk for e in emp_siteids if e.Emp_Codeid and e.Emp_Codeid.emp_isactive == True]))
+            staffs = emp_siteids
             if self.request.GET.get('sales_staff',None) == "1":
                 queryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,show_in_sales=True).order_by('emp_seq_webappt')
             
@@ -1178,10 +1182,16 @@ class EmployeeCartAPI(viewsets.ModelViewSet):
                     Q(show_in_trmt=True) | Q(show_in_sales=True)).order_by('emp_seq_webappt')
                 wqueryset = Employee.objects.filter(pk__in=staffs,emp_isactive=True,show_in_trmt=True,
                 show_in_sales=True).order_by('emp_seq_webappt')  
-                combined_list = list(chain(squeryset,wqueryset))
+                # combined_list = list(chain(squeryset,wqueryset))
+                combined_list = squeryset | wqueryset
+                # print(combined_list,"combined_list")
                 queryset = combined_list
     
-
+            q = self.request.GET.get('search',None)
+            if q:
+                queryset = queryset.filter(Q(emp_name__icontains=q) | 
+                Q(display_name__icontains=q) | Q(emp_code__icontains=q))[:20]
+            
             
             serializer_class = EmployeeDropSerializer
             total = len(queryset)
@@ -1192,9 +1202,9 @@ class EmployeeCartAPI(viewsets.ModelViewSet):
             result = response(self,request, queryset,total,  state, message, error, serializer_class, data, action=self.action)
             v = result.get('data')
             d = v.get("dataList")
-            for dat in d:
-                emp_obj = Employee.objects.filter(pk=dat['id']).first()
-                dat['emp_name'] = emp_obj.display_name
+            # for dat in d:
+            #     emp_obj = Employee.objects.filter(pk=dat['id']).first()
+            #     dat['emp_name'] = emp_obj.display_name
 
             if self.request.GET.get('check',None) == "TransacHistory":
                 dict_data = {'id':"0",'emp_name':"All",'emp_pic':""}
@@ -2578,7 +2588,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    if 'price' in req and req['price'] is 0.0:
+                    if 'price' in req and req['price'] and float(req['price']) == 0.0:
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3165,7 +3175,8 @@ class itemCartViewset(viewsets.ModelViewSet):
                     
                     autotdfor_setup = Systemsetup.objects.filter(title='autoTDForAlacarte',
                     value_name='autoTDForAlacarte',isactive=True).first()
-                    if  cart.type == 'Deposit' and int(stock_obj.item_div) == 3 and stock_obj.item_type != 'PACKAGE' and autotdfor_setup and autotdfor_setup.value_data == 'True' and req['is_service'] == True:
+                    if cart.type == 'Deposit' and int(stock_obj.item_div) == 3 and stock_obj.item_type != 'PACKAGE' and autotdfor_setup and autotdfor_setup.value_data == 'True' and 'is_service' in req and req['is_service'] == True:
+                        # print("iff")
                         empobj= fmspw[0].Emp_Codeid
                         tdf =create_tdstaff(cart,empobj,stock_obj,site)
 
@@ -3401,7 +3412,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    if req['price'] == 0.0 or not req['price']:
+                    if req['price'] and float(req['price']) == 0.0 or not req['price']:
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3816,7 +3827,7 @@ class itemCartViewset(viewsets.ModelViewSet):
     #                 result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
     #                 return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
     #             else:
-    #                 if 'price' in req and req['price'] is 0.0:
+    #                 if 'price' in req and req['price'] and float(req['price']) == 0.0:
     #                     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
     #                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -4233,7 +4244,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                         return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                     else:
-                        if 'price' in req and req['price'] is 0.0:
+                        if 'price' in req and req['price'] and float(req['price']) == 0.0:
                             result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Item price ",'error': False}
                             return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -5595,6 +5606,12 @@ class itemCartViewset(viewsets.ModelViewSet):
                 given_net = float(self.request.GET.get('net_amt',None)) 
                 # print(given_net,"given_net")
 
+                if given_net > totaltrans_amt:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Entered Net Amount Should not be greater than Total Net Amount!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
+
+
                 balance = total_amount - other_disc
                 new_cart_ids = self.filter_queryset(self.get_queryset()).filter(itemcodeid__item_div__in=[1,3],itemcodeid__item_type='SINGLE',auto=True,is_foc=False).exclude(type__in=('Top Up','Sales')).order_by('pk')
                 
@@ -5623,7 +5640,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                             discvalamt += each_discline
 
                             if not any(d['cart_id'] == ct.pk for d in net_lst):
-                                net_lst.append({'cart_id':ct.pk,'cart_obj': ct,'additional_discount':0.0,'additional_discountamt': each_discline,
+                                net_lst.append({'cart_id':ct.pk,'cart_obj': ct,'additional_discount':0.0,'additional_discountamt': "{:.2f}".format(float(each_discline)) ,
                                 'discount_price':val_d,'deposit':new_trans,'trans_amt':new_trans})
                             
                             # n = str(float(new_nettrasamt)).split('.')
@@ -5646,7 +5663,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                             dprice = ct.discount_price - one
 
                             if not any(d['cart_id'] == ct.pk for d in net_lst):
-                                net_lst.append({'cart_id':ct.pk,'cart_obj': ct,'additional_discount':0.0,'additional_discountamt': one,
+                                net_lst.append({'cart_id':ct.pk,'cart_obj': ct,'additional_discount':0.0,'additional_discountamt': "{:.2f}".format(float(one)),
                                 'discount_price':dprice,'deposit':last_val,'trans_amt':last_val})
 
                 # print(discvalamt,"discvalamt")
@@ -6524,7 +6541,7 @@ class ReceiptPdfSend(APIView):
                 prepaid_amt = 0.0   
             credit = CreditNote.objects.filter(cust_code=hdr[0].sa_custno, status='OPEN'
             ).only('cust_code','status').order_by('pk').aggregate(amount=Coalesce(Sum('balance'), 0))
-            if credit['amount'] > 0.0:
+            if credit and credit['amount'] > 0.0:
                 credit_amt = "{:.2f}".format(credit['amount'])
             else:
                 credit_amt = "0.00"  
@@ -6573,8 +6590,8 @@ class ReceiptPdfSend(APIView):
             
             prepaidlst = []
             postaud_ids = PosTaud.objects.filter(sa_transacno=sa_transacno,pay_group="PREPAID")
+            showprepaid = False
             if postaud_ids:
-                showprepaid = True
                 for po in postaud_ids:
                     spl_tn = str(po.pay_rem1).split("-")
                     ppno = spl_tn[0]
@@ -6582,12 +6599,10 @@ class ReceiptPdfSend(APIView):
                     prequeryset = PrepaidAccount.objects.filter(cust_code=hdr[0].sa_custno,
                     status=True,remain__gt=0,pp_no=ppno,line_no=lineno).only('site_code','cust_code','sa_status').order_by('-pk').first()
                     if prequeryset:
+                        showprepaid = True
                         pval = {'pp_desc':prequeryset.pp_desc,'remain':"{:.2f}".format(prequeryset.remain)}
                         prepaidlst.append(pval)
 
-
-            else:
-                showprepaid = False
             
             if hdr[0].isvoid == True and hdr[0].sa_status == "VT":
                 showvoidreason = True
@@ -6619,7 +6634,17 @@ class ReceiptPdfSend(APIView):
             if discper_setup and discper_setup.value_data == 'True':
                 discper = True
             else:
-                discper = False           
+                discper = False   
+            
+            today_date = timezone.now().date()
+
+            #today point
+            point_ids = CustomerPoint.objects.filter(cust_code=hdr[0].sa_custno,type="Reward",date__date=today_date,
+            ref_source="Sales",isvoid=False,sa_status="SA").order_by('pk').aggregate(total_point=Coalesce(Sum('total_point'), 0))
+            if point_ids and point_ids['total_point'] > 0.0:
+                today_point_amt = int(point_ids['total_point'])
+            else:
+                today_point_amt = 0                
 
             custbal = customer_balanceoutstanding(self,request, hdr[0].sa_custno)
             # print(treatopen_ids,"treatopen_ids")
@@ -6645,7 +6670,8 @@ class ReceiptPdfSend(APIView):
             'gstlable': gstlable,'trans_promo1': title.trans_promo1 if title and title.trans_promo1 else '',
             'trans_promo2' : title.trans_promo2 if title and title.trans_promo2 else '',
             'voucher_lst':voucher_lst,'voucherbal':voucherbal,
-            'discreason': discreason,'discper' : discper,
+            'discreason': discreason,'discper' : discper,'today_point_amt':today_point_amt,
+            'cust_point_value' : int(hdr[0].sa_custnoid.cust_point_value) if hdr[0].sa_custnoid and hdr[0].sa_custnoid.cust_point_value and hdr[0].sa_custnoid.cust_point_value > 0 else 0
             }
             data.update(sub_data)
             data.update(custbal)
@@ -11900,9 +11926,9 @@ class AddRemoveSalesStaffViewset(viewsets.ModelViewSet):
                     if not cartobj:
                         raise Exception("Cart id does not exist!!")
 
-                    if cartobj.type == 'Sales' and cartobj.itemcodeid.item_div == '3' and is_sales == True:
-                        tdmsg = "TD {0} Cart Line No {1}, No need to add Sales Staffs".format(str(cartobj.type),str(cartobj.lineno))
-                        raise Exception(tdmsg)
+                    # if cartobj.type == 'Sales' and cartobj.itemcodeid.item_div == '3' and is_sales == True:
+                    #     tdmsg = "TD {0} Cart Line No {1}, No need to add Sales Staffs".format(str(cartobj.type),str(cartobj.lineno))
+                    #     raise Exception(tdmsg)
 
                     if cartobj.type in ['Deposit','Top Up','Exchange'] and cartobj.itemcodeid.item_div != '3' and is_work == True:
                         wd_msg = "{0} Cart Line No {1}, No need to add Work Staffs".format(str(cartobj.type),str(cartobj.lineno))
@@ -27167,6 +27193,10 @@ class UserAuthorizationPopup(generics.CreateAPIView):
                     elif request.data['type'] == 'Payroll':
                         if fmspw_c and fmspw_c.flgpayroll == False:
                             raise Exception('Logined User not allowed to update Payroll !!')
+                    elif request.data['type'] == 'ApptBlock':
+                        if fmspw_c and fmspw_c.flgallowblockappointment == False:
+                            raise Exception('Logined User not allowed to do Block Appointment !!')
+                                
                         
 
                     log_emp = fmspw_c.Emp_Codeid

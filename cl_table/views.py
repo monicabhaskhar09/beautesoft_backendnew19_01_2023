@@ -26,7 +26,7 @@ from .models import (Gender, Employee, Fmspw, Attendance2, Customer, Images, Tre
                      ItemDiv,Tempcustsign,CustomerDocument,TreatmentPackage,Tmptreatment,CustLogAudit,ContactPerson,
                      ItemFlexiservice,termsandcondition,Dayendconfirmlog,Participants,ProjectDocument,
                      MGMPolicyCloud,CustomerReferral,sitelistip,DisplayCatalog,
-                     DisplayItem,OutletRequestLog,ItemBrand,PrepaidOpenCondition,PrepaidValidperiod)
+                     DisplayItem,OutletRequestLog,ItemBrand,PrepaidOpenCondition,PrepaidValidperiod,invoicetemplate)
 from cl_app.models import ItemSitelist, SiteGroup, LoggedInUser,TmpTreatmentSession
 from custom.models import Room,ItemCart,VoucherRecord,EmpLevel,PosPackagedeposit,payModeChangeLog,ProjectModel
 from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializer, Attendance2Serializer,
@@ -69,7 +69,7 @@ from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializ
                           DisplayCatalogSerializer,DisplayItemSerializer,DisplayItemStockSerializer,
                           DisplayItemlistSerializer,OutletRequestLogSerializer,
                           PrepaidValidperiodSerializer,ItemCartCustomerReceiptSerializer,
-                          ItemCartdaudSerializer,ScheduleMonthSerializer)
+                          ItemCartdaudSerializer,ScheduleMonthSerializer,invoicetemplateConfigSerializer,ManualRewardPointSerializer)
 from datetime import date, timedelta, datetime
 import datetime
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
@@ -2054,8 +2054,8 @@ class FMSPWViewset(viewsets.ModelViewSet):
 
     def get_object(self, pk):
         try:
-            return FMSPW.objects.get(pk=pk,pw_isactive=True)
-        except FMSPW.DoesNotExist:
+            return Fmspw.objects.get(pk=pk,pw_isactive=True)
+        except Fmspw.DoesNotExist:
             raise Http404
 
 
@@ -2297,7 +2297,7 @@ def schedulemonth_time(self, date, emp, site, start, end, type_v, appt, sc_value
     else:
         site_ids = [site.itemsite_code]
     
-    print(site_ids,"site_ids")
+    # print(site_ids,"site_ids")
     if type_v == "Edit":
         pre_start = get_in_val(self, appt.appt_fr_time)
         pre_end = get_in_val(self, appt.appt_to_time)
@@ -3143,11 +3143,31 @@ class AppointmentViewset(viewsets.ModelViewSet):
 
             
                 for idx, reqt in enumerate(treatment):
-                
-                    empobj = Employee.objects.filter(pk=reqt['emp_no'],emp_isactive=True).first()
+                    if not 'emp_no' in reqt:
+                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Employee ID!!",'error': True} 
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+
+                    empobj = False
+                    if 'emp_no' in reqt and reqt['emp_no']:
+                        empobj = Employee.objects.filter(pk=reqt['emp_no'],emp_isactive=True).first()
+                        if not empobj:
+                            result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Employee ID does not exist!!",'error': True} 
+                            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+                    else:         
+                        if not reqt['emp_no']:
+                            onlinebookingstaff_setup = Systemsetup.objects.filter(title='onlinebookingstaff',
+                            value_name='onlinebookingstaff',isactive=True).first()
+                            if onlinebookingstaff_setup and onlinebookingstaff_setup.value_data:
+                                empobj = Employee.objects.filter(pk=int(onlinebookingstaff_setup.value_data),emp_isactive=True).first()
+                                if not empobj:
+                                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"onlinebookingstaff Employee ID does not exist in settings!!",'error': True} 
+                                    return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                            
                     if not empobj:
                         result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Employee ID does not exist!!",'error': True} 
-                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+       
                     
                     stockobj = Stock.objects.filter(pk=reqt['Item_Codeid']).first()
                     if not stockobj:
@@ -3239,28 +3259,35 @@ class AppointmentViewset(viewsets.ModelViewSet):
                     # print(datelst,"datelst")
 
                         
-                    if not 'emp_no' in req:
-                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please give Employee ID!!",'error': True} 
-                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
-
-                    if req['emp_no'] is None or req['emp_no'] == []:
-                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please select the treatment staff!!",'error': True} 
-                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                    
+                    # if req['emp_no'] is None or req['emp_no'] == []:
+                    #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Please select the treatment staff!!",'error': True} 
+                    #     return Response(result, status=status.HTTP_400_BAD_REQUEST) 
                     
                     res = []; emp_lst = []
-                    if ',' in str(req['emp_no']):
-                        res = str(req['emp_no']).split(',')
+                    if 'emp_no' in req and req['emp_no']:
+                        if ',' in str(req['emp_no']):
+                            res = str(req['emp_no']).split(',')
+                        else:
+                            res = str(req['emp_no']).split(' ')
+                        
+                        if res != []:
+                            for e in res:
+                                emp_obj = Employee.objects.filter(pk=e,emp_isactive=True).first()
+                                if not emp_obj:
+                                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Employee ID does not exist!!",'error': True} 
+                                    return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                                if e not in emp_lst:
+                                    emp_lst.append(e)
                     else:
-                        res = str(req['emp_no']).split(' ')
-                    
-                    if res != []:
-                        for e in res:
-                            emp_obj = Employee.objects.filter(pk=e,emp_isactive=True).first()
-                            if not emp_obj:
-                                result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Employee ID does not exist!!",'error': True} 
-                                return Response(result, status=status.HTTP_400_BAD_REQUEST) 
-                            if e not in emp_lst:
-                                emp_lst.append(e)
+                        if not req['emp_no']:
+                            onlinebookingstaff_setup = Systemsetup.objects.filter(title='onlinebookingstaff',
+                            value_name='onlinebookingstaff',isactive=True).first()
+                            if onlinebookingstaff_setup and onlinebookingstaff_setup.value_data:
+                                emp_obj = Employee.objects.filter(pk=int(onlinebookingstaff_setup.value_data),emp_isactive=True).first()
+                       
+
+
 
                     stock_obj = Stock.objects.filter(pk=req['Item_Codeid']).first()
                     if not stock_obj:
@@ -3899,12 +3926,13 @@ class AppointmentViewset(viewsets.ModelViewSet):
                 #if fmspw.flgappt == True:
                 if 1 == 1:
                     final = []
-                    emp_siteids = list(EmpSitelist.objects.filter(Site_Codeid__pk=outlet.pk,isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True).values_list('Emp_Codeid', flat=True).distinct())
+                    emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=outlet.pk,isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True).values_list('Emp_Codeid', flat=True).distinct()))
                     # emp_queryset = Employee.objects.filter(pk__in=emp_siteids,emp_isactive=True,
                     # show_in_appt=True,show_in_trmt=True) 
-                    emp_queryset = Employee.objects.filter(pk__in=emp_siteids,emp_isactive=True,
-                    show_in_appt=True) 
-                    staffs_f = list(set([e.pk for e in emp_queryset if e.pk and e.emp_isactive == True]))
+                    # emp_queryset = Employee.objects.filter(pk__in=emp_siteids,emp_isactive=True,
+                    # show_in_appt=True) 
+                    # staffs_f = list(set([e.pk for e in emp_queryset if e.pk and e.emp_isactive == True]))
+                    staffs_f = emp_siteids
                     if sc_system_obj and sc_system_obj.value_data == 'True':
                         month = ScheduleMonth.objects.filter(itm_date=date,Emp_Codeid__pk__in=staffs_f,
                         site_code=outlet.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007'))
@@ -7741,12 +7769,14 @@ class UsersList(APIView):
             value_name='Customeroutletrestrict',isactive=True).first()
             courseautopro_setup = Systemsetup.objects.filter(title='courseautoproportion',
             value_name='courseautoproportion',isactive=True).first()
+            blockapptusernamepopup_setup = Systemsetup.objects.filter(title='BlockAppointmentUsernamePopup',
+            value_name='BlockAppointmentUsernamePopup',isactive=True).first()
+            # onlinebookingstaff_setup = Systemsetup.objects.filter(title='onlinebookingstaff',
+            # value_name='onlinebookingstaff',isactive=True).first()
+            ipadkey_setup = Systemsetup.objects.filter(title='ipadkey',
+            value_name='ipadkey',isactive=True).first()
        
        
-    
-    
-
-
             
             walkinobj = ""
             if fmspw.loginsite and fmspw.loginsite.walkin_custid:
@@ -7863,6 +7893,9 @@ class UsersList(APIView):
             'poolsharing' : True if poolsharing_setup and poolsharing_setup.value_data == 'True' else False,  
             'customeroutletrestrict' : True if outletrestrict_setup and outletrestrict_setup.value_data == 'True' else False,  
             'courseautoproportion' : True if courseautopro_setup and courseautopro_setup.value_data == 'True' else False,  
+            'blockapptusernamepopup' : True if blockapptusernamepopup_setup and blockapptusernamepopup_setup.value_data == 'True' else False,
+            # 'onlinebookingstaff_id' :  int(onlinebookingstaff_setup.value_data) if onlinebookingstaff_setup and onlinebookingstaff_setup.value_data else None,
+            'ipadkey' : True if ipadkey_setup and ipadkey_setup.value_data == 'True' else False,
             }
 
 
@@ -8513,6 +8546,10 @@ class postaudViewset(viewsets.ModelViewSet):
                 cart_date = timezone.now().date()
                 global type_ex
                 request = self.request
+                if not request.data:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Payload Should not be empty",'error': True}
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
+
                 if request.GET.get('cart_date',None) is None:
                     result = {'status': status.HTTP_204_NO_CONTENT,"message":"Please give cart date",'error': True}
                     return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
@@ -8569,8 +8606,8 @@ class postaudViewset(viewsets.ModelViewSet):
                 
                 queryset = self.filter_queryset(self.get_queryset())
                 if not queryset:
-                    result = {'status': status.HTTP_204_NO_CONTENT,"message":"No Content",'error': False, 'data': []}
-                    return Response(data=result, status=status.HTTP_200_OK)
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"No Content Cart should not be empty",'error': True}
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
                 
                 cart_ids = queryset
                 
@@ -8622,10 +8659,6 @@ class postaudViewset(viewsets.ModelViewSet):
                 if not redms_refcontrol_obj:
                     raise Exception("Redeem Sales ControlNo Does Not Exist!!")
 
-
-                
-               
-                
                 
                 depotop_ids = cart_ids.filter(type__in=['Deposit','Top Up'])
                 # print(depotop_ids,"depotop_ids")
@@ -8696,9 +8729,10 @@ class postaudViewset(viewsets.ModelViewSet):
                     
                         pacids = PrepaidAccount.objects.filter(pp_no=ppno,line_no=lineno,
                         cust_code=cust_obj.cust_code,status=True).only('pp_no','line_no','site_code','cust_code','status').order_by('pk').last()
+                        # print(pacids,"{:.2f}".format(pacids.remain),".remain")
                         if pacids and pacids.remain:
                             #if float(r['pay_amt']) > float(pac_ids.remain):
-                            if float(r['pay_amt']) > float(pacids.remain):
+                            if float(r['pay_amt']) > float("{:.2f}".format(pacids.remain)):
                                 result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
                                 return Response(data=result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -8847,8 +8881,8 @@ class postaudViewset(viewsets.ModelViewSet):
 
                 sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
                 control_obj.control_no = int(control_obj.control_no) + 1
-                control_obj.save() 
-                  
+                control_obj.save()  
+                
                 sa_count = 1
 
                 while sa_count > 0:
@@ -9019,9 +9053,10 @@ class postaudViewset(viewsets.ModelViewSet):
                                 pos_daud_lineno=line_no).order_by('pk')
 
                                 if pac_ids and ol_open_ids:
-                                    whole_ids = depo_ids.filter(itemcodeid__item_div__in=[3,1,4]).filter(~Q(itemcodeid__item_type='PACKAGE'))
-                                    service_ids = depo_ids.filter(itemcodeid__item_div=3).filter(~Q(itemcodeid__item_type='PACKAGE'))
-                                    product_ids = depo_ids.filter(itemcodeid__item_div=1).filter(~Q(itemcodeid__item_type='PACKAGE'))
+                                    # .filter(~Q(itemcodeid__item_type='PACKAGE'))
+                                    whole_ids = depotop_ids.filter(itemcodeid__item_div__in=[3,1,4,5])
+                                    service_ids = depotop_ids.filter(itemcodeid__item_div=3)
+                                    product_ids = depotop_ids.filter(itemcodeid__item_div=1).filter(~Q(itemcodeid__item_type='PACKAGE'))
             
                                     # if float(req['pay_amt']) > float(pac_ids.remain):
                                     #     result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Prepaid pay amt should not be greater than selected prepaid remain!!",'error': True} 
@@ -9110,6 +9145,8 @@ class postaudViewset(viewsets.ModelViewSet):
                                         # if prepaid_redeemlst != []:
                                         #     use_final_ids = use_final_ids.filter(~Q(pk__in=prepaid_redeemlst))
                                         # print(use_final_ids,"use_final_ids 111")
+                                        use_final_ids = use_final_ids.filter(~Q(prepaid_account__pp_no=pac_ids.pp_no),~Q(prepaid_account__line_no=pac_ids.line_no))
+                                        # print(use_final_ids,"use_final_ids 77")
                                         if use_final_ids:
                                             for i in use_final_ids:
                                                 # print(i,"ii")
@@ -9733,7 +9770,7 @@ class postaudViewset(viewsets.ModelViewSet):
                 taud_salesids = PosTaud.objects.filter(pk__in=taud_ids,itemsite_code=site.itemsite_code,
                 pay_type__in=gt1_lst).order_by('pk').aggregate(pay_amt=Coalesce(Sum('pay_amt'), 0))
                 # print(daily_taud_salesids,"daily_taud_salesids")
-                if taud_salesids['pay_amt'] > 0.0:
+                if taud_salesids and taud_salesids['pay_amt'] > 0.0:
                     payment_amt = "{:.2f}".format(taud_salesids['pay_amt'])
                 else:
                     payment_amt = "0.00"  
@@ -11331,7 +11368,8 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                 footer = {'remark':hdr[0].trans_remark if hdr[0].trans_remark else '','footer1':'','footer2':'','footer3':'','footer4':'',
                 'footer5':'','footer6':''}
                     
-
+            company_hdr.update({'comp_title3': title.comp_title3 if title and title.comp_title3 else '',
+            'comp_title4': title.comp_title4 if title and title.comp_title4 else ''}) 
             if not taud:
                 result = {'status': status.HTTP_400_BAD_REQUEST,"message":"sa_transacno Does not exist!!",'error': True} 
                 return Response(result, status=status.HTTP_400_BAD_REQUEST) 
@@ -11640,7 +11678,31 @@ class CustomerReceiptPrintList(generics.ListAPIView):
                     rounding = "0.00"
 
             taud_sub = {'gst_label':label if label else '','gst':str("{:.2f}".format(tax_amt)) if tax_amt else "0.00",'total':str("{:.2f}".format((tot_payamt))),
-            'rounding':rounding,'grand_tot':str("{:.2f}".format((tot_payamt)))}   
+            'rounding':rounding,'grand_tot':str("{:.2f}".format((tot_payamt)))}  
+
+
+            #prepaid balance show if customer pay by prepaid setting flag
+            prepaidlst = []
+            postaud_ids = PosTaud.objects.filter(sa_transacno=satransacno,pay_group="PREPAID")
+            showprepaid = False 
+            if postaud_ids:
+                for po in postaud_ids:
+                    spl_tn = str(po.pay_rem1).split("-")
+                    ppno = spl_tn[0]
+                    lineno = spl_tn[1]
+                    prequeryset = PrepaidAccount.objects.filter(cust_code=hdr[0].sa_custno,
+                    status=True,remain__gt=0,pp_no=ppno,line_no=lineno).only('site_code','cust_code','sa_status').order_by('-pk').first()
+                    # print(prequeryset,"prequeryset")
+                    if prequeryset:
+                        showprepaid = True
+                        pval = {'pp_desc':prequeryset.pp_desc,'remain':"{:.2f}".format(prequeryset.remain)}
+                        prepaidlst.append(pval)
+               
+            
+            footer_val = {'trans_promo1': title.trans_promo1 if title and title.trans_promo1 else '',
+            'trans_promo2' : title.trans_promo2 if title and title.trans_promo2 else '',
+            'showprepaid': showprepaid,'prepaidlst':prepaidlst}
+            footer.update(footer_val)
 
             state = status.HTTP_200_OK
             message = "Listed Succesfully"
@@ -18653,7 +18715,8 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                                 customer_id=k) 
                                 cp.save()
                         
-                        # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=k.pk)
+                        # checkex_ids = CustomerExtended.objects.filter(cust_code=k.cust_code,
+                        # cust_name=k.cust_name)
                         # if not checkex_ids:
                         #     CustomerExtended(cust_code=cus_code,cust_codeid=k,cust_name=k.cust_name
                         #     ,site_code=site.itemsite_code,original_sitecode=site.itemsite_code).save()
@@ -18856,7 +18919,8 @@ class CustomerPlusViewset(viewsets.ModelViewSet):
                     username=fmspw.pw_userlogin,
                     user_loginid=fmspw,updated_at=timezone.now()).save()
 
-                    # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=customer.pk).first()
+                    # checkex_ids = CustomerExtended.objects.filter(cust_code=customer.cust_code,
+                    # cust_name=customer.cust_name).first()
                     # if not checkex_ids:
                     #     CustomerExtended(cust_code=customer.cust_code,cust_codeid=customer,
                     #     cust_name=customer.cust_name,site_code=customer.site_code
@@ -25474,7 +25538,7 @@ class OutletRequestCustomerViewset(viewsets.ModelViewSet):
                         log.last_transaction_date = haud_ids.sa_date
                         log.save()
 
-                    # checkex_ids = CustomerExtended.objects.filter(cust_codeid__pk=cust_obj.pk,
+                    # checkex_ids = CustomerExtended.objects.filter(cust_name=cust_obj.cust_name,
                     # cust_code=cust_obj.cust_code).first()
                     # if not checkex_ids:
                     #     CustomerExtended(cust_code=cust_obj.cust_code,cust_codeid=cust_obj,
@@ -25558,20 +25622,25 @@ class PrepaidValidperiodAPIView(generics.ListAPIView):
             invalid_message = str(e)
             return general_error_response(invalid_message)      
 
+timedata ={'time07': "07:00", 'time0730': "07:30", 'time08': "08:00", 
+            'time0830': "08:30", 'time09': "09:00", 'time0930': "09:30", 'time10': "10:00", 
+            'time1030': "10:30", 'time11': "11:00", 'time1130': "11:30", 'time12': "12:00", 
+            'time1230': "12:30", 'time13': "13:00", 'time1330': "13:30", 'time14': "14:00", 
+            'time1430': "14:30", 'time15': "15:00", 'time1530': "15:30", 'time16': "16:00", 
+            'time1630': "16:30", 'time17': "17:00", 'time1730': "17:30", 'time18': "18:00", 
+            'time1830': "18:30", 'time19': "19:00", 'time1930': "19:30", 'time20': "20:00", 
+            'time2030': "20:30", 'time21': "21:00", 'time2130': "21:30", 'time22': "22:00", 
+            'time2230': "22:30", 'time23': "23:00", 'time2330': "23:30"}
 
 class AvailableTimeSlotsAPIView(GenericAPIView):
     authentication_classes = [ExpiringTokenAuthentication]
     permission_classes = [IsAuthenticated & authenticated_only]
     queryset = []
 
-    # def check_slots():
-    #     if query_set.time07 == False and "07:00" not in val['time_slots']:
-    #         val['time_slots'].append("07:00")
-
-
-
     def get(self, request):
         try:
+            global timedata
+
             fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
             site = fmspw.loginsite
             Item_Codeid = self.request.GET.get('Item_Codeid',None)
@@ -25594,28 +25663,20 @@ class AvailableTimeSlotsAPIView(GenericAPIView):
                 stkduration = int(srvduration)
             # print(stkduration,"stkduration")
             hrs = '{:02d}:{:02d}'.format(*divmod(stkduration, 60))
-            print(hrs,"hrs")
+            # print(hrs,"hrs")
             # dict_v['add_duration'] = hrs
             # dict_v['srv_duration'] = str(srvduration)+" "+"Mins"
             
             emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,
             isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True
             ).values_list('Emp_Codeid', flat=True).distinct()))
-            print(emp_siteids,"emp_siteids")
+            # print(emp_siteids,"emp_siteids")
            
-            queryset = list(set(ScheduleMonth.objects.filter(itm_date=given_date,Emp_Codeid__pk__in=emp_siteids,
+            queryset = list(set(ScheduleMonth.objects.filter(itm_date__date=given_date,Emp_Codeid__pk__in=emp_siteids,
             site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007')).values_list('Emp_Codeid', flat=True).distinct()))
-            print(queryset,"queryset")
+            # print(queryset,"queryset")
             main_lst = []
-            time_date ={'time07': "07:00", 'time0730': "07:30", 'time08': "08:00", 
-            'time0830': "08:30", 'time09': "09:00", 'time0930': "09:30", 'time10': "10:00", 
-            'time1030': "10:30", 'time11': "11:00", 'time1130': "11:30", 'time12': "12:00", 
-            'time1230': "12:30", 'time13': "13:00", 'time1330': "13:30", 'time14': "14:00", 
-            'time1430': "14:30", 'time15': "15:00", 'time1530': "15:30", 'time16': "16:00", 
-            'time1630': "16:30", 'time17': "17:00", 'time1730': "17:30", 'time18': "18:00", 
-            'time1830': "18:30", 'time19': "19:00", 'time1930': "19:30", 'time20': "20:00", 
-            'time2030': "20:30", 'time21': "21:00", 'time2130': "21:30", 'time22': "22:00", 
-            'time2230': "22:30", 'time23': "23:00", 'time2330': "23:30"}
+           
             for i in queryset:
                 empobj = Employee.objects.filter(pk=i,emp_isactive=True).first()
                 if empobj:
@@ -25633,12 +25694,13 @@ class AvailableTimeSlotsAPIView(GenericAPIView):
                         'time2030','time21','time2130','time22','time2230','time23',
                         'time2330')[0]
 
-                        print(field_lst,"field_lst")
-                        for key in field_lst:
-                            print(key,"key")
-                            if field_lst[key] == False and time_date[key] not in val['time_slots']:
-                                val['time_slots'].append(time_date[key])
-                        main_lst.append(val)            
+                        # print(field_lst,"field_lst")
+                        if field_lst:
+                            for key in field_lst:
+                                # print(key,"key")
+                                if (field_lst[key] == False or field_lst[key] == None) and timedata[key] not in val['time_slots']:
+                                    val['time_slots'].append(timedata[key])
+                            main_lst.append(val)            
                      
     
             # serializer = ScheduleMonthSerializer(queryset, many=True)
@@ -25649,3 +25711,468 @@ class AvailableTimeSlotsAPIView(GenericAPIView):
         except Exception as e:
             invalid_message = str(e)
             return general_error_response(invalid_message) 
+
+
+
+
+class OnlineBookingDateSlotsViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    # queryset = []
+    # serializer_class = []   
+
+    @action(detail=False, methods=['get'], name='getavailabledates')
+    def getavailabledates(self, request):
+        try: 
+            global timedata
+
+            fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+            site = fmspw.loginsite 
+            start_date = date.today()
+            # print(start_date,"start_date")
+            end_date = date.today() + timedelta(days=14)
+            # print(end_date,"end_date")
+            date_range = [(start_date + datetime.timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, (end_date - start_date).days + 1)]
+            # print(date_range,"date_range")
+
+            emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True).values_list('Emp_Codeid', flat=True).distinct()))
+            # print(emp_siteids,"emp_siteids")
+            # emp_queryset = Employee.objects.filter(pk__in=emp_siteids,emp_isactive=True,
+            # show_in_appt=True,show_in_trmt=True) 
+            main_lst = []
+            
+            for i in date_range:
+                avail_timeslots = []
+                # print(i,"i")
+                month_ids = ScheduleMonth.objects.filter(itm_date__date=i,Emp_Codeid__pk__in=emp_siteids,
+                site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007'))
+                # print(month_ids,"month_ids")
+                if month_ids:
+                    for m in month_ids:
+                        field_lst = ScheduleMonth.objects.filter(pk=m.pk
+                            ).values('time07','time0730','time08',
+                            'time0830','time09','time0930','time10','time1030','time11',
+                            'time1130','time12','time1230','time13','time1330','time14',
+                            'time1430','time15','time1530','time16','time1630','time17',
+                            'time1730','time18','time1830','time19','time1930','time20',
+                            'time2030','time21','time2130','time22','time2230','time23',
+                            'time2330')[0] 
+                        # print(field_lst,"field_lst") 
+                        
+                        if field_lst:
+                            for key in field_lst:
+                                # print(key,"key")
+                                if (field_lst[key] == False or field_lst[key] == None) and timedata[key] not in avail_timeslots:
+                                    avail_timeslots.append(timedata[key])
+
+                if avail_timeslots != []:                
+                    main_lst.append(i)       
+        
+
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data':  {"available_dates": main_lst}}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+
+
+    @action(detail=False, methods=['get'], name='getavailableslots')
+    def getavailableslots(self, request):
+        try: 
+            global timedata
+
+            fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+            site = fmspw.loginsite 
+            given_date = self.request.GET.get('given_date',None)
+            if not given_date:
+                raise ValueError("Please select given_date!!") 
+           
+            emp_siteids = list(set(EmpSitelist.objects.filter(Site_Codeid__pk=site.pk,isactive=True,Emp_Codeid__emp_isactive=True,Emp_Codeid__show_in_appt=True).values_list('Emp_Codeid', flat=True).distinct()))
+            # print(emp_siteids,"emp_siteids")
+            # emp_queryset = Employee.objects.filter(pk__in=emp_siteids,emp_isactive=True,
+            # show_in_appt=True,show_in_trmt=True) 
+            
+            avail_timeslots = []
+            month_ids = ScheduleMonth.objects.filter(itm_date__date=given_date,Emp_Codeid__pk__in=emp_siteids,
+            site_code=site.itemsite_code).filter(~Q(itm_Typeid__itm_code='100007'))
+            # print(month_ids,"month_ids")
+            if month_ids:
+                for m in month_ids:
+                    field_lst = ScheduleMonth.objects.filter(pk=m.pk
+                        ).values('time07','time0730','time08',
+                        'time0830','time09','time0930','time10','time1030','time11',
+                        'time1130','time12','time1230','time13','time1330','time14',
+                        'time1430','time15','time1530','time16','time1630','time17',
+                        'time1730','time18','time1830','time19','time1930','time20',
+                        'time2030','time21','time2130','time22','time2230','time23',
+                        'time2330')[0] 
+                    # print(field_lst,"field_lst") 
+                    
+                    if field_lst:
+                        for key in field_lst:
+                            # print(key,"key")
+                            if (field_lst[key] == False or field_lst[key] == None) and timedata[key] not in avail_timeslots:
+                                avail_timeslots.append(timedata[key])
+
+            
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data':  {"available_slots": avail_timeslots}}
+            return Response(data=result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+
+class InvoiceTemplateConfigViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = invoicetemplate.objects.filter(isactive=True).order_by('pk')
+    serializer_class = invoicetemplateConfigSerializer
+
+    def get_queryset(self):
+        queryset = invoicetemplate.objects.filter(isactive=True).order_by('pk')
+       
+        return queryset
+
+    def list(self, request):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            if queryset:
+                serializer = self.get_serializer(queryset, many=True)
+                result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+                'data':  serializer.data}
+            else:
+                serializer = self.get_serializer()
+                result = {'status': status.HTTP_204_NO_CONTENT,"message":"No Content",'error': False, 'data': []}
+            return Response(data=result, status=status.HTTP_200_OK) 
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+    @transaction.atomic
+    def create(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+                site = fmspw[0].loginsite
+
+                if not 'name' in request.data or not request.data['name']:
+                    raise Exception('Please give name!!.') 
+
+                if not 'type' in request.data or not request.data['type']:
+                    raise Exception('Please give type!!.') 
+
+                  
+                check_ids = invoicetemplate.objects.filter(name=request.data['name']).order_by('-pk')
+                if check_ids:
+                    msg = "invoicetemplate name {0} already exist or inactive !!".format(str(request.data['name']))
+                    raise Exception(msg) 
+                    
+
+                serializer = invoicetemplateConfigSerializer(data=request.data)
+                if serializer.is_valid():
+                    
+                    k = serializer.save()
+                   
+                    result = {'status': status.HTTP_201_CREATED,"message":"Created Succesfully",
+                    'error': False}
+                    return Response(result, status=status.HTTP_201_CREATED)
+                
+
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+                       
+    
+    @transaction.atomic
+    def partial_update(self, request, pk=None):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+                site = fmspw.loginsite
+                rep = self.get_object(pk)
+              
+                    
+                serializer = self.get_serializer(rep, data=request.data, partial=True)
+                if serializer.is_valid():
+                
+                    serializer.save()
+                    
+                    result = {'status': status.HTTP_200_OK,"message":"Updated Succesfully",'error': False}
+                    return Response(result, status=status.HTTP_200_OK)
+
+                
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)   
+    
+    def retrieve(self, request, pk=None):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user, pw_isactive=True).first()
+            site = fmspw.loginsite
+            rep = self.get_object(pk)
+            serializer = invoicetemplateConfigSerializer(rep, context={'request': self.request})
+            result = {'status': status.HTTP_200_OK,"message":"Listed Succesfully",'error': False, 
+            'data': serializer.data}
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+    
+    def destroy(self, request, pk=None):
+        try:
+            title = self.get_object(pk)
+            title.delete()
+            result = {'status': status.HTTP_200_OK,"message":"Deleted Succesfully",'error': False}
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message) 
+
+    def get_object(self, pk):
+        try:
+            return invoicetemplate.objects.get(pk=pk)
+        except invoicetemplate.DoesNotExist:
+            raise Exception('invoicetemplate Does not Exist') 
+            
+    
+    @transaction.atomic
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated & authenticated_only],
+    authentication_classes=[ExpiringTokenAuthentication])
+    def createdata(self, request): 
+        try:  
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+                site = fmspw[0].loginsite
+
+                
+                for idx, reqt in enumerate(request.data):    
+                    serializer = invoicetemplateConfigSerializer(data=reqt)
+                   
+                    if serializer.is_valid():
+                        k = serializer.save()
+
+                    else:
+                        data = serializer.errors
+
+                        if 'non_field_errors' in data:
+                            message = data['non_field_errors'][0]
+                        else:
+                            first_key = list(data.keys())[0]
+                            message = str(first_key)+":  "+str(data[first_key][0])
+
+                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                        'error': True, 'data': serializer.errors}
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+                      
+                result = {'status': status.HTTP_201_CREATED,"message":"Created Succesfully",
+                'error': False}
+                return Response(result, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)                
+ 
+
+
+
+
+
+class ManualRewardPointCustomerViewset(viewsets.ModelViewSet):
+    authentication_classes = [ExpiringTokenAuthentication]
+    permission_classes = [IsAuthenticated & authenticated_only]
+    queryset = CustomerPoint.objects.filter(type="Manual Reward").order_by('-pk')
+    serializer_class = ManualRewardPointSerializer
+
+    def get_queryset(self):
+        cust_obj = Customer.objects.filter(pk=self.request.GET.get('cust_id',None),cust_isactive=True).first()
+        if not cust_obj:
+            raise Exception('Customer ID does not exist') 
+
+        queryset = CustomerPoint.objects.filter(type="Manual Reward",cust_code=cust_obj.cust_code).order_by('-pk')
+       
+        return queryset
+
+
+    def list(self, request):
+        try:
+            fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True)
+            site = fmspw[0].loginsite
+            if not self.request.GET.get('cust_id',None):
+                raise Exception('Please give Customer id!!.')
+
+            serializer_class = ManualRewardPointSerializer
+            
+            queryset = self.filter_queryset(self.get_queryset())
+
+            total = len(queryset) if queryset else 0
+            state = status.HTTP_200_OK
+            message = "Listed Succesfully"
+            error = False
+            data = None
+            result=response(self,request, queryset,total,  state, message, error, serializer_class, data, action=self.action)
+            return Response(result, status=status.HTTP_200_OK) 
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+
+
+    @transaction.atomic
+    def create(self, request):
+        try:
+            with transaction.atomic():
+                fmspw = Fmspw.objects.filter(user=self.request.user,pw_isactive=True).first()
+                site = fmspw.loginsite
+
+                if not 'cust_id' in request.data or not request.data['cust_id']:
+                    raise Exception('Please give Customer id!!.') 
+
+                if not 'total_point' in request.data or not request.data['total_point']:
+                    raise Exception('Please give Point!!.') 
+
+                if not 'remarks' in request.data or not request.data['remarks']:
+                    raise Exception('Please give remark!!.') 
+                
+                if not 'ref_source' in request.data or not request.data['ref_source']:
+                    raise Exception('Please give ref source!!.') 
+        
+    
+                cust_id = request.data['cust_id'] 
+
+                cust_obj = Customer.objects.filter(pk=cust_id,cust_isactive=True).first()
+                if not cust_obj:
+                    result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Customer id Does't Exist!!",'error': True} 
+                    return Response(data=result, status=status.HTTP_400_BAD_REQUEST) 
+
+                serializer = ManualRewardPointSerializer(data=request.data)
+                if serializer.is_valid():
+                    rew_refcontrol_obj = ControlNo.objects.filter(control_description__iexact="Reward Sales",Site_Codeid__pk=fmspw.loginsite.pk).first()
+                    if not rew_refcontrol_obj:
+                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Reward Sales Control No does not exist!!",'error': True} 
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                    
+                    control_obj = ControlNo.objects.filter(control_description__iexact="Manual Reward Points",Site_Codeid__pk=fmspw.loginsite.pk).first()
+                    if not control_obj:
+                        result = {'status': status.HTTP_400_BAD_REQUEST,"message":"Manual Reward Points Control No does not exist!!",'error': True} 
+                        return Response(result, status=status.HTTP_400_BAD_REQUEST) 
+                    
+                    now_point = 0
+                    if cust_obj and cust_obj.cust_point_value == None: 
+                        now_point = 0
+                    else:
+                        if cust_obj and cust_obj.cust_point_value and cust_obj.cust_point_value > 0:
+                            now_point = cust_obj.cust_point_value
+
+                    
+                    rew_transacno = str(rew_refcontrol_obj.control_prefix)+str(rew_refcontrol_obj.Site_Codeid.itemsite_code)+str(rew_refcontrol_obj.control_no)
+                    rew_refcontrol_obj.control_no = int(rew_refcontrol_obj.control_no) + 1
+                    rew_refcontrol_obj.save()
+
+                    
+                    sa_transacno = str(control_obj.control_prefix)+str(control_obj.Site_Codeid.itemsite_code)+str(control_obj.control_no)
+                    control_obj.control_no = int(control_obj.control_no) + 1
+                    control_obj.save()  
+                    
+                    # itm_code=None,itm_desc=None
+
+                    now_point  += float(request.data['total_point'])
+
+                    ct = CustomerPointDtl(type="Manual Reward",cust_code=cust_obj.cust_code,
+                        cust_name=cust_obj.cust_name,parent_code=None,parent_desc=None,
+                        parent_display=None,itm_desc="Manual Reward Points",
+                        point="{:.2f}".format(float(request.data['total_point'])),now_point="{:.2f}".format(now_point),remark=request.data['remarks'],remark_code=None,
+                        remark_desc=None,isvoid=False,void_referenceno=None,isopen=True,qty=1,
+                        seq=False,sa_status="SA",bal_acc2=None,point_acc1=None,
+                        point_acc2=None,locid=False)
+                    ct.save()
+
+                    cust_obj.cust_point_value = "{:.2f}".format(now_point)
+                    cust_obj.save()
+
+                    custpt = CustomerPoint(transacno=rew_transacno,date=date.today(),username=fmspw.pw_userlogin,
+                    time=timezone.now(),cust_name=cust_obj.cust_name,cust_code=cust_obj.cust_code,type="Manual Reward",
+                    refno=sa_transacno,ref_source=request.data['ref_source'],isvoid=False,sa_status="SA",void_referenceno=None,
+                    total_point="{:.2f}".format(float(request.data['total_point'])),now_point="{:.2f}".format(now_point),seq=None,remarks=request.data['remarks'],
+                    bal_point="{:.2f}".format(now_point-float(request.data['total_point'])),expired=False,expired_date=None,mac_code=False,logno=False,
+                    approval_user=fmspw.pw_userlogin,cardno=False,bdate=None,pdate=None,expired_point=0,
+                    postransactionno=sa_transacno,postotalamt=0,locid=False,mgm_refno=None,tdate=None)
+                    custpt.save()
+                    rewd = self.get_object(custpt.pk)
+                    serializer_c = ManualRewardPointSerializer(rewd)
+                    
+                    if ct:
+                        ct.transacno = rew_transacno 
+                        ct.total_point = "{:.2f}".format(request.data['total_point'])
+                        ct.save()
+
+                    result = {'status': status.HTTP_201_CREATED,"message": "Created Succesfully",
+                    'error': False,'data': serializer_c.data}
+                    return Response(result, status=status.HTTP_201_CREATED)
+
+    
+                data = serializer.errors
+
+                if 'non_field_errors' in data:
+                    message = data['non_field_errors'][0]
+                else:
+                    first_key = list(data.keys())[0]
+                    message = str(first_key)+":  "+str(data[first_key][0])
+
+                result = {'status': status.HTTP_400_BAD_REQUEST,"message":message,
+                'error': True, 'data': serializer.errors}
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+                
+
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)    
+         
+    
+    def get_object(self, pk):
+        try:
+            return CustomerPoint.objects.get(pk=pk)
+        except CustomerPoint.DoesNotExist:
+            raise Exception('CustomerPoint ID Does not Exist') 
+
+    def retrieve(self, request, pk=None):
+        try:
+            rewd = self.get_object(pk)
+            serializer = ManualRewardPointSerializer(rewd)
+            result = {'status': status.HTTP_200_OK , "message": "Listed Succesfully", 'error': False, 'data':  serializer.data}
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            invalid_message = str(e)
+            return general_error_response(invalid_message)
+         
+
+
+
+               
