@@ -20,6 +20,7 @@ router.register(r'outletrequestcustomer', views.OutletRequestCustomerViewset, ba
 router.register(r'manualrewardpoint', views.ManualRewardPointCustomerViewset, basename='manualrewardpoint')
 router.register(r'onlinebooking', views.OnlineBookingDateSlotsViewset, basename='onlinebooking')
 router.register(r'invoicetemplateconfig', views.InvoiceTemplateConfigViewset, basename='invoicetemplateconfig')
+router.register(r'appointbooking', views.AppointBookingDateSlotsViewset, basename='appointbooking')
 
 
 urlpatterns = [

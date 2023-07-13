@@ -287,7 +287,7 @@ EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_PORT = 587
 EMAIL_HOST_USER = 'noreplybeautesoft@gmail.com'
-EMAIL_HOST_PASSWORD = 'vnyawmeuzdnmtlky'
+EMAIL_HOST_PASSWORD = 'wtdwakaibtuqctbi'
 
 SMS_SECRET_KEY = "JBSWY3DPEHPK3VAG"
 SMS_ACCOUNT_SID = 'AC908cc6d0a44dc2a10ad84fea39d791ae'
