@@ -26,7 +26,7 @@ from .models import (Gender, Employee, Fmspw, Attendance2, Customer, Images, Tre
                      ItemDiv,Tempcustsign,CustomerDocument,TreatmentPackage,Tmptreatment,CustLogAudit,ContactPerson,
                      ItemFlexiservice,termsandcondition,Dayendconfirmlog,Participants,ProjectDocument,
                      MGMPolicyCloud,CustomerReferral,sitelistip,DisplayCatalog,
-                     DisplayItem,OutletRequestLog,ItemBrand,PrepaidOpenCondition,PrepaidValidperiod,invoicetemplate)
+                     DisplayItem,OutletRequestLog,ItemBrand,PrepaidOpenCondition,PrepaidValidperiod,invoicetemplate,ItemBatchSno)
 from cl_app.models import ItemSitelist, SiteGroup, LoggedInUser,TmpTreatmentSession
 from custom.models import Room,ItemCart,VoucherRecord,EmpLevel,PosPackagedeposit,payModeChangeLog,ProjectModel
 from .serializers import (EmployeeSerializer, FMSPWSerializer, UserLoginSerializer, Attendance2Serializer,
@@ -9599,7 +9599,7 @@ class postaudViewset(viewsets.ModelViewSet):
 
                 #detail creation
                 id_lst = [] ; totQty = 0; discount_amt=0.0;additional_discountamt=0.0; total_disc = 0.0
-                outstanding_new = 0.0
+                outstanding_new = 0.0;batchsno_ids = []
                 
                 gt1_ids = Paytable.objects.filter(gt_group='GT1',pay_isactive=True).order_by('-pk') 
                 gt1_lst = list(set([i.pay_code for i in gt1_ids if i.pay_code]))
@@ -9610,7 +9610,7 @@ class postaudViewset(viewsets.ModelViewSet):
                 cart_deposit = sum([i.deposit for i in cart_ids])
 
                 if depo_ids:
-                    depo = invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding, pay_date, pay_time,taud_gt1ids,cart_deposit)
+                    depo,batchsno_ids = invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding, pay_date, pay_time,taud_gt1ids,cart_deposit)
                     for dep in depo:
                         if dep not in id_lst:
                             id_lst.append(dep) 
@@ -9662,7 +9662,7 @@ class postaudViewset(viewsets.ModelViewSet):
                         in_refcontrol_obj = ControlNo.objects.filter(control_description__iexact="Reference Non Sales No",Site_Codeid__pk=fmspw.loginsite.pk).first()
                         sa_transacno_type = "Non Sales"
                         
-                    focnot_ids = cart_ids.filter(is_foc=False) 
+                    focnot_ids = cart_ids.filter(type__in=['Deposit','Top Up'],is_foc=False) 
                     if focnot_ids:
                         sa_transacno_refval = str(in_refcontrol_obj.control_prefix)+str(in_refcontrol_obj.Site_Codeid.itemsite_code)+str(in_refcontrol_obj.control_no)
                         in_refcontrol_obj.control_no = int(in_refcontrol_obj.control_no) + 1
@@ -9698,6 +9698,11 @@ class postaudViewset(viewsets.ModelViewSet):
                     hdr.sa_date = pay_date
                     hdr.sa_time = pay_time
                     hdr.save()
+
+                    #ItemBatchSno
+                    if batchsno_ids != []:
+                        ItemBatchSno.objects.filter(pk__in=batchsno_ids).update(doc_outno=hdr.sa_transacno_ref)
+
 
                     #treatmentpackage
                     p_ids = TreatmentPackage.objects.filter(sa_transacno=sa_transacno).update(sa_transacno_ref=hdr.sa_transacno_ref)

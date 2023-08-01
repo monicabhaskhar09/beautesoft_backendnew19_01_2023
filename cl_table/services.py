@@ -245,7 +245,7 @@ def invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding
         site = fmspw.loginsite
         empl = fmspw.Emp_Codeid
         id_lst = [] ; totQty = 0; discount_amt=0.0;additional_discountamt=0.0; total_disc = 0.0
-        outstanding_new = 0.0
+        outstanding_new = 0.0;itmbatchsno_id_lst = []
         gst = GstSetting.objects.filter(isactive=True,activefromdate__date__lte=pay_date,
         activetodate__date__gte=pay_date).first()
         
@@ -1463,6 +1463,9 @@ def invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding
                         if batchso_ids:
                             batchso_ids.availability = False
                             batchso_ids.save()
+                            if batchso_ids.pk not in itmbatchsno_id_lst:
+                                itmbatchsno_id_lst.append(batchso_ids.pk)
+
 
                         dtl.save()    
                     
@@ -2688,7 +2691,7 @@ def invoice_deposit(self, request, depo_ids, sa_transacno, cust_obj, outstanding
 
 
             # tmptrd_ids = Tmptreatment.objects.filter(itemcart=c).order_by('pk').delete()
-        return id_lst
+        return id_lst,itmbatchsno_id_lst
     # except Exception as e:
     #     invalid_message = str(e)
     #     return general_error_response(invalid_message)
