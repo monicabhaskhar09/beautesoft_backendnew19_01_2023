@@ -1510,6 +1510,8 @@ class PrepaidAccount(models.Model):
     Item_Codeid = models.ForeignKey('cl_table.Stock', on_delete=models.PROTECT, null=True) 
     item_code = models.CharField(db_column='Item_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
     terminate_prepaid = models.BooleanField(default=False)  # Field name made lowercase.
+    preacc_useid = models.CharField(max_length=500, blank=True, null=True)  # Field name made lowercase.
+
 
     class Meta:
         db_table = 'Prepaid_Account'
@@ -1584,6 +1586,7 @@ class PrepaidAccountCondition(models.Model):
     membercardnoaccess = models.BooleanField(db_column='MemberCardNoAccess', null=True)  # Field name made lowercase.
     use_amt = models.FloatField(db_column='Use_Amt', blank=True, null=True)  # Field name made lowercase.
     remain = models.FloatField(db_column='Remain', blank=True, null=True)  # Field name made lowercase.
+    topup_remain = models.FloatField(db_column='Topup_Remain', blank=True, null=True)  # Field name made lowercase.
     pos_daud_lineno = models.FloatField(db_column='POS_Daud_LineNo', null=True)  # Field name made lowercase.
     system_remark = models.CharField(db_column='System_Remark', max_length=100, blank=True, null=True)  # Field name made lowercase.
     lpackage = models.BooleanField(db_column='lPackage', null=True)  # Field name made lowercase.
@@ -1601,6 +1604,54 @@ class PrepaidAccountCondition(models.Model):
 
     def __str__(self):
         return str(self.pp_no)
+
+
+class TempprepaidAccountCondition(models.Model):
+    id = models.AutoField(db_column='ID',primary_key=True)  # Field name made lowercase.
+    pp_no = models.CharField(db_column='PP_NO', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    pp_type = models.CharField(db_column='PP_TYPE', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    pp_desc = models.CharField(db_column='PP_DESC', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    p_itemtype = models.CharField(db_column='P_ItemType', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    item_code = models.CharField(max_length=20, blank=True, null=True)
+    conditiontype1 = models.CharField(db_column='ConditionType1', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    conditiontype2 = models.CharField(db_column='ConditionType2', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    rate = models.CharField(db_column='Rate', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    membercardnoaccess = models.BooleanField(db_column='MemberCardNoAccess', null=True)  # Field name made lowercase.
+    use_amt = models.FloatField(db_column='Use_Amt', blank=True, null=True)  # Field name made lowercase.
+    remain = models.FloatField(db_column='Remain', blank=True, null=True)  # Field name made lowercase.
+    pos_daud_lineno = models.FloatField(db_column='POS_Daud_LineNo', blank=True, null=True)  # Field name made lowercase.
+    mac_uid_ref = models.CharField(db_column='MAC_UID_Ref', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    prepaidaccount_cond = models.ForeignKey('cl_table.PrepaidAccountCondition', on_delete=models.PROTECT,null=True)
+    cart_id = models.CharField(max_length=20, null=True)
+    prepaid_account = models.ForeignKey('cl_table.PrepaidAccount', on_delete=models.PROTECT,null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+
+
+    class Meta:
+        db_table = 'TempPrepaid_Account_Condition'  
+
+    def __str__(self):
+        return str(self.pp_no)
+
+class TempcartprepaidAccCond(models.Model):
+    id = models.AutoField(db_column='ID',primary_key=True)  # Field name made lowercase.
+    cart_id = models.CharField(max_length=20, null=True)
+    prepaidaccount_cond = models.ForeignKey('cl_table.PrepaidAccountCondition', on_delete=models.PROTECT,null=True)
+    itemcart = models.ForeignKey('custom.ItemCart', on_delete=models.PROTECT,null=True)
+    use_amt = models.FloatField(db_column='Use_Amt', blank=True, null=True)  # Field name made lowercase.
+    bal_amt = models.FloatField(db_column='Bal_Amt', blank=True, null=True)  # Field name made lowercase.
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        db_table = 'TempCartPrepaid_Account_Condition'  
+
+    def __str__(self):
+        return str(self.pp_no)
+        
+      
+
 
 class VoucherCondition(models.Model):
     itemid = models.AutoField(db_column='ItemID',primary_key=True)  # Field name made lowercase.
@@ -1924,8 +1975,8 @@ class PosDaud(models.Model):
     topup_outstanding = models.FloatField(db_column='TopUp_Outstanding', blank=True, null=True)  # Field name made lowercase.
     # t1_tax_code = models.CharField(db_column='T1_Tax_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
     # t1_tax_amt = models.FloatField(db_column='T1_Tax_Amt', blank=True, null=True)  # Field name made lowercase.
-    # t2_tax_code = models.CharField(db_column='T2_Tax_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    # t2_tax_amt = models.FloatField(db_column='T2_Tax_Amt', blank=True, null=True)  # Field name made lowercase.
+    t2_tax_code = models.CharField(db_column='T2_Tax_Code', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    t2_tax_amt = models.FloatField(db_column='T2_Tax_Amt', blank=True, null=True)  # Field name made lowercase.
     # dt_grossamt = models.CharField(db_column='dt_GrossAmt', max_length=20, blank=True, null=True)  # Field name made lowercase.
     # dt_topup_old_outs_amt = models.FloatField(db_column='dt_TopUp_Old_Outs_Amt', blank=True, null=True)  # Field name made lowercase.
     # dt_topup_new_outs_amt = models.FloatField(db_column='dt_TopUp_New_Outs_Amt', blank=True, null=True)  # Field name made lowercase.
@@ -4129,6 +4180,7 @@ class CustomerDocument(models.Model):
     class Meta:
         db_table = 'CustomerDocument'
 
+
 class ProjectDocument(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True) 
     customer_id = models.ForeignKey('cl_table.Customer', on_delete=models.PROTECT,null=True) 
@@ -4142,6 +4194,28 @@ class ProjectDocument(models.Model):
 
     class Meta:
         db_table = 'ProjectDocument'
+
+class StaffDocument(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True) 
+    employee = models.ForeignKey('cl_table.Employee', on_delete=models.PROTECT,null=True) 
+    filename = models.CharField(db_column='filename', max_length=500, blank=True, null=True)
+    document_name = models.CharField(db_column='document_name', max_length=500, blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False) 
+    file = models.FileField(upload_to='img')
+ 
+    class Meta:
+        db_table = 'StaffDocument'  
+
+class OutletDocument(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True) 
+    site = models.ForeignKey('cl_app.ItemSitelist', on_delete=models.PROTECT,null=True) 
+    filename = models.CharField(db_column='filename', max_length=500, blank=True, null=True)
+    document_name = models.CharField(db_column='document_name', max_length=500, blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False) 
+    file = models.FileField(upload_to='img')
+ 
+    class Meta:
+        db_table = 'OutletDocument' 
 
 class CustLogAudit(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)
@@ -4374,5 +4448,17 @@ class invoicetemplate(models.Model):
         db_table = 'invoicetemplate'
         unique_together = (('name'),)
 
+
+class TaxType2TaxCode(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    item_code = models.CharField(db_column='ITEM_CODE', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    tax_code = models.CharField(db_column='TAX_CODE', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    tax_desc = models.CharField(db_column='TAX_DESC', max_length=1000, blank=True, null=True)  # Field name made lowercase.
+    tax_rate_percent = models.FloatField(db_column='TAX_RATE_PERCENT', blank=True, null=True)  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='ISACTIVE', blank=True, null=True)  # Field name made lowercase.
+    item_seq = models.FloatField(db_column='ITEM_SEQ', blank=True, null=True)  # Field name made lowercase.
+  
+    class Meta:
+        db_table = 'TAX_TYPE2_TAX_CODE'
 
 

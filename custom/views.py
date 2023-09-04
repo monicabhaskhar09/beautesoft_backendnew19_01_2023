@@ -45,7 +45,7 @@ TreatmentAccount, PosDaud, ItemDept, DepositAccount, PrepaidAccount, ItemDiv, Sy
 PackageHdr,PackageDtl,Paytable,Multistaff,ItemBatch,Stktrn,ItemUomprice,Holditemdetail,CreditNote,
 CustomerClass,ItemClass,Tmpmultistaff,Tmptreatment,ExchangeDtl,ItemUom,ItemHelper,PrepaidAccountCondition,
 City, State, Country, Stock,PayGroup,Tempcustsign,Item_MembershipPrice,TreatmentPackage,PrepaidOpenCondition,
-ItemBrand,CustomerPoint)
+ItemBrand,CustomerPoint,TempprepaidAccountCondition,TempcartprepaidAccCond)
 from cl_app.models import ItemSitelist, SiteGroup, TmpTreatmentSession,TmpItemHelperSession
 from cl_table.serializers import (PostaudSerializer,StaffsAvailableSerializer,PosdaudSerializer,TmpItemHelperSerializer,
 PrepaidOpenConditionSerializer)
@@ -1728,6 +1728,9 @@ def get_cartid(self, request, cust_obj):
                             Tmpmultistaff.objects.filter(itemcart=instance).delete()
                             Tmptreatment.objects.filter(itemcart=instance).delete()
                             PrepaidOpenCondition.objects.filter(itemcart=instance).delete()
+                            TempprepaidAccountCondition.objects.filter(cart_id=instance.cart_id).delete()
+                            TempcartprepaidAccCond.objects.filter(cart_id=instance.cart_id).delete()
+
                             if instance.multi_treat.all().exists():
                                 for i in instance.multi_treat.all():
                                     TmpItemHelper.objects.filter(treatment=i).delete()
@@ -1893,6 +1896,9 @@ class itemCartViewset(viewsets.ModelViewSet):
                                     Tmpmultistaff.objects.filter(itemcart=instance).delete()
                                     Tmptreatment.objects.filter(itemcart=instance).delete()
                                     PrepaidOpenCondition.objects.filter(itemcart=instance).delete()
+                                    TempprepaidAccountCondition.objects.filter(cart_id=instance.cart_id).delete()
+                                    TempcartprepaidAccCond.objects.filter(cart_id=instance.cart_id).delete()
+
                                     if instance.multi_treat.all().exists():
                                         for i in instance.multi_treat.all():
                                             TmpItemHelper.objects.filter(treatment=i).delete()
@@ -2828,11 +2834,7 @@ class itemCartViewset(viewsets.ModelViewSet):
                         if not uom_obj:
                             raise Exception('ItemUom ID does not exist!!')
 
-                        batchids = ItemBatch.objects.filter(site_code=site.itemsite_code,item_code=str(stock_obj.item_code),
-                        uom=uom_obj.uom_code).order_by('pk').last() 
-                        if not batchids:
-                            raise Exception('Inventory Onhand ItemBatch does not exist!!')
-
+                        
                         # if valuedata == 'TRUE' and batchids:
                         #     if int(req['qty']) > int(batchids.qty):
                         #         raise Exception('Inventory ohand qty is less than cart qty') 
@@ -2857,14 +2859,24 @@ class itemCartViewset(viewsets.ModelViewSet):
                                 if obatchids and int(obatchids.qty) > 0:
                                     flag = True
 
+                        batchids = ItemBatch.objects.filter(site_code=site.itemsite_code,item_code=str(stock_obj.item_code),
+                        uom=uom_obj.uom_code).order_by('pk').last() 
+                        if batchids:
+                            batch_qty = int(batchids.qty)
+                        else:
+                            batch_qty = 0
+
+                        # if valuedata == 'TRUE' or ('batch_sno' in req and req['batch_sno']):
+                        #     if not batchids:
+                        #         raise Exception('Inventory Onhand ItemBatch does not exist!!')
 
                         if valuedata == 'TRUE':
-                            if batchids and int(req['qty']) > int(batchids.qty):
+                            if int(req['qty']) > int(batch_qty):
                                 if flag == False:
                                     raise Exception('Inventory Onhand is not available for this Selected UOM retail product') 
         
                         if 'batch_sno' in req and req['batch_sno']:
-                            if batchids and int(req['qty']) > int(batchids.qty):
+                            if int(req['qty']) > int(batch_qty):
                                 if flag == False:
                                     raise Exception('Inventory Onhand is not available for this Selected Batch SNo UOM retail product') 
         
@@ -6118,6 +6130,9 @@ class itemCartViewset(viewsets.ModelViewSet):
         Tmpmultistaff.objects.filter(itemcart=instance).delete()
         Tmptreatment.objects.filter(itemcart=instance).delete()
         PrepaidOpenCondition.objects.filter(itemcart=instance).delete()
+        TempprepaidAccountCondition.objects.filter(cart_id=instance.cart_id).delete()
+        TempcartprepaidAccCond.objects.filter(cart_id=instance.cart_id).delete()
+
         if instance.multi_treat.all().exists():
             for i in instance.multi_treat.all():
                 TmpItemHelper.objects.filter(treatment=i).delete()
@@ -6598,8 +6613,20 @@ class ReceiptPdfSend(APIView):
                     spl_tn = str(po.pay_rem1).split("-")
                     ppno = spl_tn[0]
                     lineno = spl_tn[1]
-                    prequeryset = PrepaidAccount.objects.filter(cust_code=hdr[0].sa_custno,
-                    status=True,remain__gt=0,pp_no=ppno,line_no=lineno).only('site_code','cust_code','sa_status').order_by('-pk').first()
+
+                    if po and po.pay_rem2:
+                        mpre_obj = PrepaidAccount.objects.filter(pk=po.pay_rem2).first()
+                    else:
+                        mpre_obj = False
+                    
+                    if mpre_obj and mpre_obj.package_code:
+                        prequeryset = PrepaidAccount.objects.filter(cust_code=hdr[0].sa_custno,
+                        status=True,remain__gt=0,pp_no=ppno,line_no=lineno,
+                        package_code_lineno=mpre_obj.package_code_lineno).only('site_code','cust_code','sa_status').order_by('-pk').first()
+                    else:
+                        prequeryset = PrepaidAccount.objects.filter(cust_code=hdr[0].sa_custno,
+                        status=True,remain__gt=0,pp_no=ppno,line_no=lineno).only('site_code','cust_code','sa_status').order_by('-pk').first()
+                    
                     if prequeryset:
                         pval = {'pp_desc':prequeryset.pp_desc,'remain':"{:.2f}".format(prequeryset.remain)}
                         prepaidlst.append(pval)
@@ -6659,6 +6686,12 @@ class ReceiptPdfSend(APIView):
 
             custbal = customer_balanceoutstanding(self,request, hdr[0].sa_custno)
             # print(treatopen_ids,"treatopen_ids")
+
+            ot_seal = BASE_DIR + "/media/img/oriential_tcm_seal.jpeg"
+            # print(ot_seal,"ot_seal")
+            ot_logo = BASE_DIR + "/media/img/oriential_tcm.jpeg"
+            # print(ot_logo,"ot_logo")
+
             data = {'name': title.trans_h1 if title and title.trans_h1 else '', 
             'address': title.trans_h2 if title and title.trans_h2 else '', 
             'footer1':title.trans_footer1 if title and title.trans_footer1 else '',
@@ -6683,7 +6716,8 @@ class ReceiptPdfSend(APIView):
             'voucher_lst':voucher_lst,'voucherbal':voucherbal,
             'discreason': discreason,'discper' : discper,'today_point_amt':today_point_amt,
             'cust_point_value' : int(hdr[0].sa_custnoid.cust_point_value) if hdr[0].sa_custnoid and hdr[0].sa_custnoid.cust_point_value and hdr[0].sa_custnoid.cust_point_value > 0 else 0,
-            'title': title
+            'title': title,'ot_seal':ot_seal if os.path.isfile(ot_seal) else '',
+            'ot_logo':ot_logo if os.path.isfile(ot_logo) else ''
             }
             data.update(sub_data)
             data.update(custbal)
@@ -6703,7 +6737,6 @@ class ReceiptPdfSend(APIView):
                 'margin-left': '.25in',
                 'encoding': "UTF-8",
                 'no-outline': None,
-                
             }
             
             # existing = os.listdir(settings.PDF_ROOT)
@@ -7446,7 +7479,7 @@ class ExchangeProductConfirmAPIView(generics.CreateAPIView):
                                 if hold.pk:
                                     con_obj.control_no = int(con_obj.control_no) + 1
                                     con_obj.save()
-                                    dtl.holditemqty = 0
+                                    dtl.holditemqty = int(c.holditemqty)
                                     dtl.save()
 
 
@@ -7724,7 +7757,7 @@ class ExchangeProductConfirmAPIView(generics.CreateAPIView):
                                 if hold.pk:
                                     con_obj.control_no = int(con_obj.control_no) + 1
                                     con_obj.save()
-                                    dtl.holditemqty = 0
+                                    dtl.holditemqty = int(c.holditemqty)
                                     dtl.save()
 
                             
@@ -9939,6 +9972,9 @@ class CartItemDeleteAPIView(APIView):
                     Tmpmultistaff.objects.filter(itemcart=instance).delete()
                     Tmptreatment.objects.filter(itemcart=instance).delete()
                     PrepaidOpenCondition.objects.filter(itemcart=instance).delete()
+                    TempprepaidAccountCondition.objects.filter(cart_id=instance.cart_id).delete()
+                    TempcartprepaidAccCond.objects.filter(cart_id=instance.cart_id).delete()
+
                     if instance.multi_treat.all().exists():
                         for i in instance.multi_treat.all():
                             TmpItemHelper.objects.filter(treatment=i).delete()
@@ -28286,7 +28322,6 @@ class StudioPdfGeneration(APIView):
                 'margin-left': '.25in',
                 'encoding': "UTF-8",
                 'no-outline': None,
-                
             }
             
             # existing = os.listdir(settings.PDF_ROOT)
